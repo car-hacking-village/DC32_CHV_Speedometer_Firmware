@@ -439,7 +439,7 @@ TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
 			// (avoids a lot of cluster math in SD library).
 			// Bitmap is stored bottom-to-top order (normal BMP)
 			int pos = result->header.offset + (h - 1 - row) * rowSize;
-			ESP_LOGD(__FUNCTION__,"_result->header.offset=%d pos=%d rowSize=%d", result->header.offset, pos, rowSize);
+			// ESP_LOGD(__FUNCTION__,"_result->header.offset=%d pos=%d rowSize=%d", result->header.offset, pos, rowSize);
 			fseek(fp, pos, SEEK_SET);
 			int buffidx = sizeof(sdbuffer); // Force buffer reload
 
@@ -487,6 +487,34 @@ TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
 	return diffTick;
 }
 
+char *dickbutt[] = {
+	"/spiffs/00001.bmp",
+	"/spiffs/00002.bmp",
+	"/spiffs/00003.bmp",
+	"/spiffs/00004.bmp",
+	"/spiffs/00005.bmp",
+	"/spiffs/00006.bmp",
+	"/spiffs/00007.bmp",
+	"/spiffs/00008.bmp",
+	"/spiffs/00009.bmp",
+	"/spiffs/00010.bmp",
+	"/spiffs/00011.bmp",
+	"/spiffs/00012.bmp",
+	"/spiffs/00013.bmp",
+	"/spiffs/00014.bmp",
+	"/spiffs/00015.bmp",
+	"/spiffs/00016.bmp",
+	"/spiffs/00017.bmp",
+	"/spiffs/00018.bmp",
+	"/spiffs/00019.bmp",
+	"/spiffs/00020.bmp",
+	"/spiffs/00021.bmp",
+	"/spiffs/00022.bmp",
+	"/spiffs/00023.bmp",
+	"/spiffs/00024.bmp",
+	"/spiffs/00025.bmp",
+};
+
 
 void ST7565(void *pvParameters)
 {
@@ -500,9 +528,9 @@ void ST7565(void *pvParameters)
 #endif
 
 #if CONFIG_INVERSION
+#endif
 	ESP_LOGI(TAG, "Display Inversion");
 	lcdInversionOn(&dev);
-#endif
 
 	//for TEST
 #if 0
@@ -516,71 +544,83 @@ void ST7565(void *pvParameters)
 
 
 	while(1) {
-		FillTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// FillTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		BarTest(&dev, VERTICAL, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// BarTest(&dev, VERTICAL, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		BarTest(&dev, HORIZONTAL, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// BarTest(&dev, HORIZONTAL, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		ArrowTest(&dev, font8x8, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// ArrowTest(&dev, font8x8, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		LineTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// LineTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		CircleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// CircleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		RectAngleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// RectAngleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		RoundRectTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// RoundRectTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		TriangleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// TriangleTest(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
-		DirectionTest(&dev, font8x8, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		// DirectionTest(&dev, font8x8, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// WAIT;
 
 		char file[32];
-		strcpy(file, "/spiffs/sample1.bmp");
-		BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-		WAIT;
+		for (int i = 0; i < 25; i++)
+		{
+			strcpy(file, dickbutt[i]);
+			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+			// WAIT;
+			// vTaskDelay(20);
+		}
 
-		// Multi Font Test
-		uint8_t ascii[40];
-		lcdFillScreen(&dev, WHITE);
-		lcdSetFontDirection(&dev, DIRECTION0);
-		strcpy((char *)ascii, "6x8 Font");
-		int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 6)) / 2;
-		lcdDrawString2(&dev, font6x8, xpos, 8, ascii, BLACK);
+		// char file[32];
 
-		lcdSetFontRevert(&dev);
-		lcdDrawString2(&dev, font6x8, xpos, 16, ascii, BLACK);
-		lcdUnsetFontRevert(&dev);
+		// strcpy(file, "/spiffs/00001_0.bmp");
+		// BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+		// // WAIT;
+		// vTaskDelay(20);
 
-		strcpy((char *)ascii, "8x8 NormalFont");
-		xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 8)) / 2;
-		lcdDrawString2(&dev, font8x8, xpos, 32, ascii, BLACK);
 
-		lcdSetFontRevert(&dev);
-		lcdDrawString2(&dev, font8x8, xpos, 40, ascii, BLACK);
-		lcdUnsetFontRevert(&dev);
+		// // Multi Font Test
+		// uint8_t ascii[40];
+		// lcdFillScreen(&dev, WHITE);
+		// lcdSetFontDirection(&dev, DIRECTION0);
+		// strcpy((char *)ascii, "6x8 Font");
+		// int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 6)) / 2;
+		// lcdDrawString2(&dev, font6x8, xpos, 8, ascii, BLACK);
 
-		strcpy((char *)ascii, "8x8 Bold Font");
-		xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 8)) / 2;
-		lcdDrawString2(&dev, font8x8_bold, xpos, 56, ascii, BLACK);
+		// lcdSetFontRevert(&dev);
+		// lcdDrawString2(&dev, font6x8, xpos, 16, ascii, BLACK);
+		// lcdUnsetFontRevert(&dev);
 
-		lcdSetFontRevert(&dev);
-		lcdDrawString2(&dev, font8x8_bold, xpos, 64, ascii, BLACK);
-		lcdUnsetFontRevert(&dev);
+		// strcpy((char *)ascii, "8x8 NormalFont");
+		// xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 8)) / 2;
+		// lcdDrawString2(&dev, font8x8, xpos, 32, ascii, BLACK);
 
-		lcdWriteBuffer(&dev);
-		WAIT;
+		// lcdSetFontRevert(&dev);
+		// lcdDrawString2(&dev, font8x8, xpos, 40, ascii, BLACK);
+		// lcdUnsetFontRevert(&dev);
+
+		// strcpy((char *)ascii, "8x8 Bold Font");
+		// xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 8)) / 2;
+		// lcdDrawString2(&dev, font8x8_bold, xpos, 56, ascii, BLACK);
+
+		// lcdSetFontRevert(&dev);
+		// lcdDrawString2(&dev, font8x8_bold, xpos, 64, ascii, BLACK);
+		// lcdUnsetFontRevert(&dev);
+
+		// lcdWriteBuffer(&dev);
+		// WAIT;
 
 	} // end while
 

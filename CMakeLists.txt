@@ -10,3 +10,6 @@ project(st7565)
 # the generated image should be flashed when the entire project is flashed to
 # the target with 'idf.py -p PORT flash
 spiffs_create_partition_image(storage image FLASH_IN_PROJECT)
+
+target_compile_options(${lib} PRIVATE -Wno-error=format)
+
