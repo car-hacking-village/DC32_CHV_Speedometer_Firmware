@@ -1,1 +1,4 @@
 build
+sdkconfig*
+.DS_Store
+*/.DS_Store
