@@ -25,7 +25,7 @@ menu "ST7565 Configuration"
 		int "MOSI GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 23 if IDF_TARGET_ESP32
-		default 35 if IDF_TARGET_ESP32S2
+		default 6  if IDF_TARGET_ESP32S2
 		default 35 if IDF_TARGET_ESP32S3
 		default 0  if IDF_TARGET_ESP32C3
 		help
@@ -38,7 +38,7 @@ menu "ST7565 Configuration"
 		int "SCLK GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 18 if IDF_TARGET_ESP32
-		default 36 if IDF_TARGET_ESP32S2
+		default 7  if IDF_TARGET_ESP32S2
 		default 36 if IDF_TARGET_ESP32S3
 		default 1  if IDF_TARGET_ESP32C3
 		help
@@ -51,7 +51,7 @@ menu "ST7565 Configuration"
 		int "CS GPIO number"
 		range -1 GPIO_RANGE_MAX
 		default 5  if IDF_TARGET_ESP32
-		default 34 if IDF_TARGET_ESP32S2
+		default 10 if IDF_TARGET_ESP32S2
 		default 34 if IDF_TARGET_ESP32S3
 		default 5  if IDF_TARGET_ESP32C3
 		help
@@ -65,7 +65,7 @@ menu "ST7565 Configuration"
 		int "DC GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 27 if IDF_TARGET_ESP32
-		default 40 if IDF_TARGET_ESP32S2
+		default 8  if IDF_TARGET_ESP32S2
 		default 40 if IDF_TARGET_ESP32S3
 		default 2  if IDF_TARGET_ESP32C3
 		help
@@ -78,7 +78,7 @@ menu "ST7565 Configuration"
 		int "RESET GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 33 if IDF_TARGET_ESP32
-		default 41 if IDF_TARGET_ESP32S2
+		default 9  if IDF_TARGET_ESP32S2
 		default 41 if IDF_TARGET_ESP32S3
 		default 3  if IDF_TARGET_ESP32C3
 		help
@@ -91,7 +91,7 @@ menu "ST7565 Configuration"
 		int "BACKLIGHT GPIO number"
 		range -1 GPIO_RANGE_MAX
 		default 32 if IDF_TARGET_ESP32
-		default 33 if IDF_TARGET_ESP32S2
+		default 5  if IDF_TARGET_ESP32S2
 		default 33 if IDF_TARGET_ESP32S3
 		default 4  if IDF_TARGET_ESP32C3
 		help
@@ -112,5 +112,13 @@ menu "ST7565 Configuration"
 		default false
 		help
 			Enable Display Inversion.
+
+	config GPIO_INPUT_0
+        int "GPIO input pin 0"
+        range 0 GPIO_RANGE_MAX
+        range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
+        default 0
+        help
+            GPIO pin number to be used as GPIO_INPUT_IO_0.
 
 endmenu
