@@ -23,6 +23,18 @@
 
 static const char *TAG = "ST7565";
 
+// You have to set these CONFIG value using menuconfig.
+#if 0
+#define CONFIG_WIDTH 128
+#define CONFIG_HEIGHT 64
+#define CONFIG_MOSI_GPIO 23
+#define CONFIG_SCLK_GPIO 18
+#define CONFIG_CS_GPIO 5
+#define CONFIG_DC_GPIO 27
+#define CONFIG_RESET_GPIO 33
+#define CONFIG_BL_GPIO 32
+#endif
+
 static void SPIFFS_Directory(char * path) {
 	DIR* dir = opendir(path);
 	assert(dir != NULL);
@@ -242,83 +254,89 @@ I need to use interrupt handlers better to handle high priority stuff
 */
 TFT_t dev;
 
-// void ST7565(void *pvParameters)
-// {
-// 	TFT_t dev;
-// 	spi_master_init(&dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
-// 	lcdInit(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-
-// #if CONFIG_FLIP
-// 	ESP_LOGI(TAG, "Flip upside down");
-// 	lcdFlipOn(&dev);
-// #endif
-
-// #if CONFIG_INVERSION
-// #endif
-// 	ESP_LOGI(TAG, "Display Inversion");
-// 	lcdInversionOn(&dev);
-
-// 	while(1) {
-
-// 		char file[32];
-// 		for (int i = 0; i < 25; i++)
-// 		{
-// 			strcpy(file, dickbutt[i]);
-// 			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-// 			// WAIT;
-// 			// vTaskDelay(20);
-// 		}
-
-// 	} // end while
-
-// 	// never reach
-// 	while (1) {
-// 		vTaskDelay(2000 / portTICK_PERIOD_MS);
-// 	}
-// }
-
-/*
-
-Switching between the main tasks
-
-there will be 3 major tasks with an interrupt from GPIO
-
-The current idea is to have the interreupt inform the current task
-it is time to suspend itself and when it gets to a stopping point it
-will switch to the next task by giving the next task its semaphore
-and then suspending itself
-
-*/
-
-// Current frame of dickbutt
-uint32_t cdick = 0;
-char file[32];
-
-// This function is meant to execute one 'step' in it's logic and then check if it is time to return
-void dickbutt_loop()
+void ST7565(void *pvParameters)
 {
-	if (cdick >= 25) cdick = 0;
+	TFT_t dev;
+	spi_master_init(&dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
+	lcdInit(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
 
-	strcpy(file, dickbutt[cdick]);
-	BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+#if CONFIG_FLIP
+	ESP_LOGI(TAG, "Flip upside down");
+	lcdFlipOn(&dev);
+#endif
 
-	cdick++;
+#if CONFIG_INVERSION
+#endif
+	ESP_LOGI(TAG, "Display Inversion");
+	lcdInversionOn(&dev);
+
+	while(1) {
+
+		char file[32];
+		for (int i = 0; i < 25; i++)
+		{
+			strcpy(file, dickbutt[i]);
+			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+			// WAIT;
+			// vTaskDelay(20);
+		}
+
+	} // end while
+
+	// never reach
+	while (1) {
+		vTaskDelay(2000 / portTICK_PERIOD_MS);
+	}
 }
 
-// Meant to be looped
-void dickbutt_dummy_loop()
+static SemaphoreHandle_t db_sem;
+static SemaphoreHandle_t db0_sem;
+
+void dickbutt(void *pvParameters)
 {
-	// If 0 was the last iterration it will be a large number
-	if (cdick >= 25) cdick = 24;
+	while(true) {
+		xSemaphoreTake(db_sem, portMAX_DELAY);
 
-	strcpy(file, dickbutt[cdick]);
-	BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+		while(true) {
+			char file[32];
+			for (int i = 0; i < 25; i++)
+			{
+				strcpy(file, dickbutt[i]);
+				BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+			}
+		}
+		xSemaphoreGive(db0_sem);
+	}
+}
 
-	cdick--;
+void dickbutt(void *pvParameters)
+{
+	while(true) {
+		xSemaphoreTake(db0_sem, portMAX_DELAY);
+
+		while(true) {
+			char file[32];
+			for (int i = 0; i < 25; i++)
+			{
+				strcpy(file, dickbutt[i]);
+				BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+
+
+			}
+
+			if (xQueueReceive(gpio_evt_queue, NULL, 0)) {
+				xSemaphoreGive(db_sem);
+			}
+		}
+	}
 }
 
 void app_main(void)
 {
+
+	db_sem  = xSemaphoreCreateBinary();
+	db0_sem = xSemaphoreCreateBinary();
+
 	ESP_LOGI(TAG, "Initializing SPIFFS");
 
 	esp_vfs_spiffs_conf_t conf = {
@@ -328,7 +346,7 @@ void app_main(void)
 		.format_if_mount_failed =true
 	};
 
-	// Use settings defined above to initialize and mount SPIFFS filesystem.
+	// Use settings defined above toinitialize and mount SPIFFS filesystem.
 	// Note: esp_vfs_spiffs_register is anall-in-one convenience function.
 	esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
@@ -355,7 +373,7 @@ void app_main(void)
 
 	// ESP_LOGI(TAG, "Spinning up display task");
 	// xTaskCreate(ST7565, "ST7565", 1024*6, NULL, 2, NULL);
-	// Display init
+	// INIT INSTEAD
 	spi_master_init(&dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
 	lcdInit(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
 
@@ -368,39 +386,12 @@ void app_main(void)
 #endif
 	ESP_LOGI(TAG, "Display Inversion");
 	lcdInversionOn(&dev);
-	// END Display init
 
-	// ESP_LOGI(TAG, "Spinning up dickbutt task");
-	// xTaskCreate(dickbutt_loop, "dickbutt", 1024*6, NULL, 3, NULL);
-
-	// ESP_LOGI(TAG, "Spinning up dickbutt_dummy task");
-	// xTaskCreate(dickbutt_dummy_loop, "dickbutt_dummy", 1024*6, NULL, 3, NULL);
+	ESP_LOGI(TAG, "Spinning up dickbutt task");
+	xTaskCreate(dickbutt, "dickbutt", 1024*6, NULL, 2, NULL);
 
 	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
-	QueueHandle_t gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));	
-	gpio_interrupt_init(&gpio_evt_queue);
+	gpio_interrupt_init();
 
-	// xSemaphoreGive(db_sem);
-	uint32_t io_num;
-
-    while(1) {
-
-        while(true) {
-        	dickbutt_loop();
-
-        	if(uxQueueMessagesWaiting(gpio_evt_queue) &&
-        	   xQueueReceive(gpio_evt_queue, &io_num, 0)) {
-        		break;
-        	}
-        }
-
-        while(true) {
-        	dickbutt_dummy_loop();
-
-        	if(uxQueueMessagesWaiting(gpio_evt_queue) &&
-        	   xQueueReceive(gpio_evt_queue, &io_num, 0)) {
-        		break;
-        	}
-        }
-    }
+	xSemaphoreGive(db_sem);
 }

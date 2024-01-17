@@ -15,4 +15,4 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 
-void gpio_interrupt_init(void);
+void gpio_interrupt_init(QueueHandle_t *);

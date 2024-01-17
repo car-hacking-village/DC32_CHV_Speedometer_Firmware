@@ -15,6 +15,8 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 
+#include "gpio_helper.h"
+
 /**
  * Brief:
  * This test code shows how to configure gpio and how to use gpio interrupt.
@@ -44,21 +46,24 @@ static QueueHandle_t gpio_evt_queue = NULL;
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-}
-
-static void gpio_task_example(void* arg)
-{
-    uint32_t io_num;
-    for(;;) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            printf("GPIO[%"PRIu32"] intr, val: %d\n", io_num, gpio_get_level(io_num));
-        }
+    if (xQueueIsQueueEmptyFromISR(gpio_evt_queue)) {
+        xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
     }
 }
 
-void gpio_interrupt_init(void)
+// static void gpio_task_example(void* arg)
+// {
+//     uint32_t io_num;
+//     for(;;) {
+//         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+//             printf("GPIO[%"PRIu32"] intr, val: %d\n", io_num, gpio_get_level(io_num));
+//         }
+//     }
+// }
+
+void gpio_interrupt_init(QueueHandle_t *queue)
 {
+
     //zero-initialize the config structure.
     gpio_config_t io_conf = {};
     //interrupt of rising edge
@@ -72,14 +77,16 @@ void gpio_interrupt_init(void)
     gpio_config(&io_conf);
 
     //create a queue to handle gpio event from isr
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    gpio_evt_queue = *queue;
     //start gpio task
-    xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+    // xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
 
     //install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     //hook isr handler for specific gpio pin
     gpio_isr_handler_add(GPIO_INPUT_IO_0, gpio_isr_handler, (void*) GPIO_INPUT_IO_0);
+
+    // gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));
 
     printf("Minimum free heap size: %"PRIu32" bytes\n", esp_get_minimum_free_heap_size());
 }
