@@ -1,50 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_err.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "esp_vfs.h"
-#include "esp_spiffs.h"
-
-#include "st7565.h"
-#include "bmpfile.h"
-#include "font6x8.h"
-#include "font8x8.h"
-#include "font8x8_bold.h"
-
-#include "gpio_helper.h"
-
-#define	INTERVAL 400
-#define WAIT vTaskDelay(INTERVAL)
+#include "display_helper.h"
 
 static const char *TAG = "ST7565";
-
-// You have to set these CONFIG value using menuconfig.
-#if 0
-#define CONFIG_WIDTH 128
-#define CONFIG_HEIGHT 64
-#define CONFIG_MOSI_GPIO 23
-#define CONFIG_SCLK_GPIO 18
-#define CONFIG_CS_GPIO 5
-#define CONFIG_DC_GPIO 27
-#define CONFIG_RESET_GPIO 33
-#define CONFIG_BL_GPIO 32
-#endif
-
-static void SPIFFS_Directory(char * path) {
-	DIR* dir = opendir(path);
-	assert(dir != NULL);
-	while (true) {
-		struct dirent*pe = readdir(dir);
-		if (!pe) break;
-		ESP_LOGI(__FUNCTION__,"d_name=%s d_ino=%d d_type=%x", pe->d_name,pe->d_ino, pe->d_type);
-	}
-	closedir(dir);
-}
 
 TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
 	TickType_t startTick, endTick, diffTick;
@@ -215,183 +172,18 @@ TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
 	return diffTick;
 }
 
-char *dickbutt[] = {
-	"/spiffs/00001.bmp",
-	"/spiffs/00002.bmp",
-	"/spiffs/00003.bmp",
-	"/spiffs/00004.bmp",
-	"/spiffs/00005.bmp",
-	"/spiffs/00006.bmp",
-	"/spiffs/00007.bmp",
-	"/spiffs/00008.bmp",
-	"/spiffs/00009.bmp",
-	"/spiffs/00010.bmp",
-	"/spiffs/00011.bmp",
-	"/spiffs/00012.bmp",
-	"/spiffs/00013.bmp",
-	"/spiffs/00014.bmp",
-	"/spiffs/00015.bmp",
-	"/spiffs/00016.bmp",
-	"/spiffs/00017.bmp",
-	"/spiffs/00018.bmp",
-	"/spiffs/00019.bmp",
-	"/spiffs/00020.bmp",
-	"/spiffs/00021.bmp",
-	"/spiffs/00022.bmp",
-	"/spiffs/00023.bmp",
-	"/spiffs/00024.bmp",
-	"/spiffs/00025.bmp",
-};
-
-/*
-
-I imagine this driver is going to need some some better state machines.
-
-tasks that are not waiting to do something should be a higher priority and have discrete jobs to complete
-
-I need to use interrupt handlers better to handle high priority stuff
-
-*/
-TFT_t dev;
-
-void ST7565(void *pvParameters)
+void display_init(TFT_t *dev)
 {
-	TFT_t dev;
-	spi_master_init(&dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
-	lcdInit(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
+	spi_master_init(dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
+	lcdInit(dev, CONFIG_WIDTH, CONFIG_HEIGHT);
 
 #if CONFIG_FLIP
 	ESP_LOGI(TAG, "Flip upside down");
-	lcdFlipOn(&dev);
+	lcdFlipOn(dev);
 #endif
 
 #if CONFIG_INVERSION
 #endif
 	ESP_LOGI(TAG, "Display Inversion");
-	lcdInversionOn(&dev);
-
-	while(1) {
-
-		char file[32];
-		for (int i = 0; i < 25; i++)
-		{
-			strcpy(file, dickbutt[i]);
-			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-			// WAIT;
-			// vTaskDelay(20);
-		}
-
-	} // end while
-
-	// never reach
-	while (1) {
-		vTaskDelay(2000 / portTICK_PERIOD_MS);
-	}
-}
-
-static SemaphoreHandle_t db_sem;
-static SemaphoreHandle_t db0_sem;
-
-void dickbutt(void *pvParameters)
-{
-	while(true) {
-		xSemaphoreTake(db_sem, portMAX_DELAY);
-
-		while(true) {
-			char file[32];
-			for (int i = 0; i < 25; i++)
-			{
-				strcpy(file, dickbutt[i]);
-				BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-			}
-		}
-		xSemaphoreGive(db0_sem);
-	}
-}
-
-void dickbutt(void *pvParameters)
-{
-	while(true) {
-		xSemaphoreTake(db0_sem, portMAX_DELAY);
-
-		while(true) {
-			char file[32];
-			for (int i = 0; i < 25; i++)
-			{
-				strcpy(file, dickbutt[i]);
-				BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-
-
-			}
-
-			if (xQueueReceive(gpio_evt_queue, NULL, 0)) {
-				xSemaphoreGive(db_sem);
-			}
-		}
-	}
-}
-
-void app_main(void)
-{
-
-	db_sem  = xSemaphoreCreateBinary();
-	db0_sem = xSemaphoreCreateBinary();
-
-	ESP_LOGI(TAG, "Initializing SPIFFS");
-
-	esp_vfs_spiffs_conf_t conf = {
-		.base_path = "/spiffs",
-		.partition_label = NULL,
-		.max_files = 16,
-		.format_if_mount_failed =true
-	};
-
-	// Use settings defined above toinitialize and mount SPIFFS filesystem.
-	// Note: esp_vfs_spiffs_register is anall-in-one convenience function.
-	esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-	if (ret != ESP_OK) {
-		if (ret == ESP_FAIL) {
-			ESP_LOGE(TAG, "Failed to mount or format filesystem");
-		} else if (ret == ESP_ERR_NOT_FOUND) {
-			ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-		} else {
-			ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)",esp_err_to_name(ret));
-		}
-		return;
-	}
-
-	size_t total = 0, used = 0;
-	ret = esp_spiffs_info(NULL, &total,&used);
-	if (ret != ESP_OK) {
-		ESP_LOGE(TAG,"Failed to get SPIFFS partition information (%s)",esp_err_to_name(ret));
-	} else {
-		ESP_LOGI(TAG,"Partition size: total: %d, used: %d", total, used);
-	}
-
-	SPIFFS_Directory("/spiffs/");
-
-	// ESP_LOGI(TAG, "Spinning up display task");
-	// xTaskCreate(ST7565, "ST7565", 1024*6, NULL, 2, NULL);
-	// INIT INSTEAD
-	spi_master_init(&dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
-	lcdInit(&dev, CONFIG_WIDTH, CONFIG_HEIGHT);
-
-#if CONFIG_FLIP
-	ESP_LOGI(TAG, "Flip upside down");
-	lcdFlipOn(&dev);
-#endif
-
-#if CONFIG_INVERSION
-#endif
-	ESP_LOGI(TAG, "Display Inversion");
-	lcdInversionOn(&dev);
-
-	ESP_LOGI(TAG, "Spinning up dickbutt task");
-	xTaskCreate(dickbutt, "dickbutt", 1024*6, NULL, 2, NULL);
-
-	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
-	gpio_interrupt_init();
-
-	xSemaphoreGive(db_sem);
+	lcdInversionOn(dev);
 }
