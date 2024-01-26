@@ -16,5 +16,5 @@
 // #include "font8x8.h"
 // #include "font8x8_bold.h"
 
-TickType_t BMPTest(TFT_t * dev, char * file, int width, int height);
+TickType_t BMPTest(TFT_t * dev, char * file, int width, int height, bool inverse);
 void display_init(TFT_t * dev);

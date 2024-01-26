@@ -3,7 +3,7 @@
 
 static const char *TAG = "ST7565";
 
-TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
+TickType_t BMPTest(TFT_t * dev, char * file, int width, int height, bool inverse) {
 	TickType_t startTick, endTick, diffTick;
 	startTick = xTaskGetTickCount();
 
@@ -137,8 +137,13 @@ TickType_t BMPTest(TFT_t * dev, char * file, int width, int height) {
 				}
 				if (col < _cols || col > _cole) continue;
 				// Convert pixel from BMP to TFT format, push to display
+				
 				colors[index] = sdbuffer[buffidx] & mask;
 				if (colors[index] != 0) colors[index] = BLACK; 
+				if (inverse) {
+					colors[index] = (colors[index] == BLACK) ? WHITE : BLACK;
+				}
+		
 #if 0
 				if (row == 0) {
 					ESP_LOGI(__FUNCTION__,"dbuffer[%d]=%02x colors[%d]=%d", buffidx, sdbuffer[buffidx], index, colors[index]);
@@ -182,8 +187,8 @@ void display_init(TFT_t *dev)
 	lcdFlipOn(dev);
 #endif
 
-#if CONFIG_INVERSION
-#endif
-	ESP_LOGI(TAG, "Display Inversion");
-	lcdInversionOn(dev);
+// #if CONFIG_INVERSION
+// #endif
+// 	ESP_LOGI(TAG, "Display Inversion");
+// 	lcdInversionOn(dev);
 }

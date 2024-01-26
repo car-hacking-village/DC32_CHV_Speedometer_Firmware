@@ -70,10 +70,11 @@ static QueueHandle_t gpio_evt_queue = NULL;
 static QueueHandle_t task_switch_queue = NULL;
 
 static SemaphoreHandle_t dickbutt_sem;
-static SemaphoreHandle_t dickbutt_dummy_sem;
+static SemaphoreHandle_t speedometer_sem;
 
 // Suspend current task if suspend queue is received
-void barrier(SemaphoreHandle_t current_sem) {
+// Returns true if the barrier returns from being blocked
+bool barrier(SemaphoreHandle_t current_sem) {
     uint32_t io_num;
 
     // Wait for GPIO event, checking for a message first and moving on otherwise
@@ -85,7 +86,10 @@ void barrier(SemaphoreHandle_t current_sem) {
         xQueueSend(task_switch_queue, &current_sem, NULL);
 		// The current task will wait until called again
 	   	xSemaphoreTake(current_sem, portMAX_DELAY);
+
+	   	return true;
 	}
+	return false;
 }
 
 static void task_switch(void *pvParameters)
@@ -97,10 +101,10 @@ static void task_switch(void *pvParameters)
 
         if (c_sem == dickbutt_sem) {
         	ESP_LOGI(TAG, "00");
-    		xSemaphoreGive(dickbutt_dummy_sem);
+    		xSemaphoreGive(speedometer_sem);
         }
 
-        else if (c_sem == dickbutt_dummy_sem) {
+        else if (c_sem == speedometer_sem) {
         	ESP_LOGI(TAG, "01");
     		xSemaphoreGive(dickbutt_sem);
     	}
@@ -111,6 +115,27 @@ static void task_switch(void *pvParameters)
     }
 }
 
+void speedometer(void *pvParameters)
+{
+	uint16_t xpos = 63;
+	uint16_t ypos = 63;
+	
+	// Wait
+	xSemaphoreTake(speedometer_sem, portMAX_DELAY);
+
+	lcdFillScreen(&dev, WHITE);
+	lcdDrawCircle(&dev, xpos, ypos, 62, BLACK);
+	lcdWriteBuffer(&dev);
+
+	for(;;) {
+		if(barrier(speedometer_sem)) {
+			lcdFillScreen(&dev, WHITE);
+			lcdDrawCircle(&dev, xpos, ypos, 62, BLACK);
+			lcdWriteBuffer(&dev);
+		}
+	}
+}
+
 void dickbutt_task(void *pvParameters)
 {
 	char file[32];
@@ -119,31 +144,11 @@ void dickbutt_task(void *pvParameters)
 	xSemaphoreTake(dickbutt_sem, portMAX_DELAY);
 
 	for(;;) {
-		for (uint32_t i = 0; i < 25; i++)
-			{
-				barrier(dickbutt_sem);
+		for (uint32_t i = 0; i < 25; i++) {
+			barrier(dickbutt_sem);
 
-				strcpy(file, dickbutt[i]);
-				BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
-			}
-	}
-}
-
-void dickbutt_dummy_task(void *pvParameters)
-{
-	char file[32];
-	
-	// Wait
-	xSemaphoreTake(dickbutt_dummy_sem, portMAX_DELAY);
-
-	for(;;) {
-
-		for (uint32_t i = 24; i < 25; i--)
-		{
-			barrier(dickbutt_dummy_sem);
-			
 			strcpy(file, dickbutt[i]);
-			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT);
+			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT, true);
 		}
 	}
 }
@@ -157,7 +162,7 @@ void app_main(void)
 	gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));	
 
 	dickbutt_sem= xSemaphoreCreateBinary();
-	dickbutt_dummy_sem = xSemaphoreCreateBinary();
+	speedometer_sem = xSemaphoreCreateBinary();
 
 	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
 	gpio_interrupt_init(&gpio_evt_queue);
@@ -165,15 +170,15 @@ void app_main(void)
 	ESP_LOGI(TAG, "Spinning up dickbutt task");
 	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, 9, NULL);
 
-	ESP_LOGI(TAG, "Spinning up dickbutt_dummy task");
-	xTaskCreate(dickbutt_dummy_task, "dickbutt_dummy", 1024*6, NULL, 9, NULL);
+	ESP_LOGI(TAG, "Spinning up speedometer task");
+	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, 9, NULL);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others
 	ESP_LOGI(TAG, "Spinning up task_switch task");
     xTaskCreate(task_switch, "task_switch", 2048, NULL, 8, NULL);
 
-	xSemaphoreGive(dickbutt_sem);
+	xSemaphoreGive(speedometer_sem);
 
     while(1) {
         vTaskDelay(portMAX_DELAY);
