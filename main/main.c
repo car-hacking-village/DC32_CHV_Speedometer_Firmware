@@ -151,7 +151,7 @@ void speedometer(void *pvParameters)
 	uint16_t t_pos = 0;
 	bool forward = true;
 
-	// // Wait
+	// Wait
 	// xSemaphoreTake(speedometer_sem, portMAX_DELAY);
 
 	// lcdFillScreen(&dev, WHITE);
@@ -162,20 +162,12 @@ void speedometer(void *pvParameters)
 		if(barrier(speedometer_sem)) {
 			// Only needs to be drawn once
 			lcdFillScreen(&dev, WHITE);
-		// 	// REMOVE
-		// 	lcdDrawCircle(&dev, cx_center, cy_center, 62, BLACK);
-		// 	// REMOVE
-		// 	lcdDrawLine(&dev, 1, 63, 125, cy_center, BLACK);
-		//  	lcdWriteBuffer(&dev);
 		}
 
-		// 270 is the leftmost, making 90 the rightmost
-		// This centers the triangle on the point, not what we want
-		// lcdDrawTriangle(&dev, 62, 32, 6, 30, 270, BLACK);
-
 		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, BLACK);
+	 	// write to screen
 	 	lcdWriteBuffer(&dev);
-	 	// Clear last triagle
+	 	// delete last triagle in buffer
 		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, WHITE);
 
  		if (forward) {
