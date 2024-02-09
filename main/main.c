@@ -154,7 +154,12 @@ void speedometer(void *pvParameters)
 	// Wait
 	// xSemaphoreTake(speedometer_sem, portMAX_DELAY);
 
-	// lcdFillScreen(&dev, WHITE);
+	lcdFillScreen(&dev, WHITE);
+
+	uint8_t test_berf[] = {0xFC, 0x35, 0xFC, 0x3F, 0xFC, 0x35, 0xFC, 0x3F, 0x79, 0x1C, 0x66, 0x6B, 0x43, 0x1D, 0xF4, 0xB2};
+	for(int i = 0; i < 16; i++) {
+		dev._buffer[i] = test_berf[i];
+	}
 	// lcdDrawCircle(&dev, cx_center, cy_center, 62, BLACK);
 	// lcdWriteBuffer(&dev);
 

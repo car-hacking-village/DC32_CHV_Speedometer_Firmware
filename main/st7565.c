@@ -172,6 +172,11 @@ void lcdInit(TFT_t * dev, int width, int height)
 	uint8_t *buffer = (uint8_t*)malloc(dev->_blen);
 	dev->_buffer = buffer;
 
+	// for(int i = 0; i < dev->_blen; i++) {
+	// 	ESP_LOGI(TAG, "0x%x", buffer[i]);
+	// }
+
+	// These values are good for 3.3V Vcc
 	spi_master_write_command(dev, 0xe2); // system reset
 	spi_master_write_command(dev, 0x40); // set LCD start line to 0
 	spi_master_write_command(dev, 0xa0); // set SEG direction (A1 to flip horizontal)
@@ -182,9 +187,9 @@ void lcdInit(TFT_t * dev, int width, int height)
 	spi_master_write_command(dev, 0x2f); // Voltage follower on
 	spi_master_write_command(dev, 0xf8); // set booster ratio to
 	spi_master_write_command(dev, 0x00); // 4x
-	spi_master_write_command(dev, 0x23); // set resistor ratio = 4
+	spi_master_write_command(dev, 0x23); // set resistor ratio = 5
 	spi_master_write_command(dev, 0x81);
-	spi_master_write_command(dev, 0x28); // set contrast = 40
+	spi_master_write_command(dev, 0x2c); // set contrast = 44
 	spi_master_write_command(dev, 0xac); // set static indicator off
 	spi_master_write_command(dev, 0x00);
 	spi_master_write_command(dev, 0xa6); // disable inverse
