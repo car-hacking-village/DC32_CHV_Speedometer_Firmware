@@ -19,6 +19,7 @@
 #include "gpio_helper.h"
 #include "spiffs_helper.h"
 #include "display_helper.h"
+#include "catface_helper.h"
 
 // #define	INTERVAL 400
 // #define WAIT vTaskDelay(INTERVAL)
@@ -91,9 +92,9 @@ I need to use interrupt handlers better to handle high priority stuff
 TFT_t dev;
 
 static QueueHandle_t gpio_evt_queue = NULL;
-
 static QueueHandle_t task_switch_queue = NULL;
 
+static SemaphoreHandle_t catface_sem;
 static SemaphoreHandle_t dickbutt_sem;
 static SemaphoreHandle_t speedometer_sem;
 
@@ -104,6 +105,7 @@ bool barrier(SemaphoreHandle_t current_sem) {
 
     // Wait for GPIO event, checking for a message first and moving on otherwise
     // The queue needs to return something, so humor it
+    // It is the responsibility of each task to complete one cycle and check if it needs to give up control
 	if(uxQueueMessagesWaiting(gpio_evt_queue) &&
 	   xQueueReceive(gpio_evt_queue, &io_num, 0)) {
 	   	
@@ -124,15 +126,20 @@ static void task_switch(void *pvParameters)
     for(;;) {
         xQueueReceive(task_switch_queue, &c_sem, portMAX_DELAY);
 
-        if (c_sem == dickbutt_sem) {
-        	ESP_LOGI(TAG, "00");
-    		xSemaphoreGive(speedometer_sem);
-        }
+		if (c_sem == speedometer_sem) {
+        	ESP_LOGI(TAG, "GIVE catface_sem");
+    		xSemaphoreGive(catface_sem);
+    	}
 
-        else if (c_sem == speedometer_sem) {
-        	ESP_LOGI(TAG, "01");
+		else if (c_sem == catface_sem) {
+        	ESP_LOGI(TAG, "GIVE dickbutt_sem");
     		xSemaphoreGive(dickbutt_sem);
     	}
+
+        else if (c_sem == dickbutt_sem) {
+        	ESP_LOGI(TAG, "GIVE speedometer_sem");
+    		xSemaphoreGive(speedometer_sem);
+        }
 
     	else {
         	ESP_LOGI(TAG, "PROBLEM");
@@ -142,8 +149,8 @@ static void task_switch(void *pvParameters)
 
 void speedometer(void *pvParameters)
 {
-	uint16_t cx_center = 63;
-	uint16_t cy_center = 63;
+	// uint16_t cx_center = 63;
+	// uint16_t cy_center = 63;
 
 	uint16_t ax_center = 62;
 	uint16_t ay_center = 59;
@@ -151,19 +158,17 @@ void speedometer(void *pvParameters)
 	uint16_t t_pos = 0;
 	bool forward = true;
 
-	// Wait
-	// xSemaphoreTake(speedometer_sem, portMAX_DELAY);
-
+	// As this is the first task this needs to be here, could prolly move this to the main function
 	lcdFillScreen(&dev, WHITE);
 
+	// Test (which works) this displays hex in pixels on the screen, use this later for displaying the flag
 	uint8_t test_berf[] = {0xFC, 0x35, 0xFC, 0x3F, 0xFC, 0x35, 0xFC, 0x3F, 0x79, 0x1C, 0x66, 0x6B, 0x43, 0x1D, 0xF4, 0xB2};
 	for(int i = 0; i < 16; i++) {
 		dev._buffer[i] = test_berf[i];
 	}
-	// lcdDrawCircle(&dev, cx_center, cy_center, 62, BLACK);
-	// lcdWriteBuffer(&dev);
 
 	for(;;) {
+		// This clears the screen of the previous stuff
 		if(barrier(speedometer_sem)) {
 			// Only needs to be drawn once
 			lcdFillScreen(&dev, WHITE);
@@ -172,7 +177,7 @@ void speedometer(void *pvParameters)
 		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, BLACK);
 	 	// write to screen
 	 	lcdWriteBuffer(&dev);
-	 	// delete last triagle in buffer
+	 	// delete last triagle in buffer without drawing, we can save a write doing this
 		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, WHITE);
 
  		if (forward) {
@@ -201,12 +206,50 @@ void dickbutt_task(void *pvParameters)
 
 	for(;;) {
 		for (uint32_t i = 0; i < 25; i++) {
+			// No need for clearing the screen as the animation will over write the entire screen
 			barrier(dickbutt_sem);
 
 			strcpy(file, dickbutt[i]);
 			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT, true);
 		}
 	}
+}
+
+void catface_task(void *pvParameters)
+{
+	xSemaphoreTake(catface_sem, portMAX_DELAY);
+
+	for(;;) {
+		if(barrier(catface_sem)) {
+			// screen requires being wiped on return
+			lcdFillScreen(&dev, WHITE);
+		}
+		catface_helper(&dev);
+	}
+}
+
+void cargotchi_task(void *pvParameters)
+{
+	/*
+		Monsters are born as babies
+			- idle (2 states, bouncing around the screen)
+			- must be given gas to turn into adult
+
+		there are going to be several states that the 'monster' can be in at any point of time
+			- idle 100% (2 states, bouncing around the screen)
+			- idle 50% (2 states, bouncing around the screen)
+			- idle 25% (2 states, bouncing around the screen)
+			- healing (2 states, drinking gas, kinda chugging it)
+			- fighting (1 state, attacking)
+			- being hit (1 state, being attacked)
+			- dead (2 state with little ghost coming out)
+			- victory (after winning)
+
+		The monster must have persistent health
+		on death they revert to a baby after hatching
+
+		state is stored on file system?
+	*/
 }
 
 void app_main(void)
@@ -217,7 +260,8 @@ void app_main(void)
 	task_switch_queue = xQueueCreate(1, sizeof(SemaphoreHandle_t));	
 	gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));	
 
-	dickbutt_sem= xSemaphoreCreateBinary();
+	catface_sem = xSemaphoreCreateBinary();
+	dickbutt_sem = xSemaphoreCreateBinary();
 	speedometer_sem = xSemaphoreCreateBinary();
 
 	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
@@ -225,6 +269,9 @@ void app_main(void)
 
 	ESP_LOGI(TAG, "Spinning up dickbutt task");
 	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, 9, NULL);
+
+	ESP_LOGI(TAG, "Spinning up catface task");
+	xTaskCreate(catface_task, "catface", 1024*6, NULL, 9, NULL);
 
 	ESP_LOGI(TAG, "Spinning up speedometer task");
 	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, 9, NULL);

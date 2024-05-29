@@ -601,7 +601,7 @@ void lcdDrawFillArrow(TFT_t * dev, uint16_t x0,uint16_t y0,uint16_t x1,uint16_t 
 // color:color
 int lcdDrawChar2(TFT_t * dev, uint8_t *font, uint16_t x, uint16_t y, uint8_t ascii, uint8_t color) {
 	uint16_t xx,yy;
-	unsigned char fonts[128]; // font pattern
+	// unsigned char fonts[128]; // font pattern
 	unsigned char pw, ph;
 	uint16_t mask;
 
@@ -609,14 +609,15 @@ int lcdDrawChar2(TFT_t * dev, uint8_t *font, uint16_t x, uint16_t y, uint8_t asc
 	pw = font[0];
 	ph = font[1];
 	int fsize = pw * ph / 8;
-	int index = ascii * fsize;
+	int offset = ascii * fsize;
+	int index = 0;
 	if(_DEBUG_)printf("ascii=%d pw=%d ph=%d fsize=%d index=%d\n",ascii,pw,ph,fsize,index);
 	//for(int i=0; i<pw; i++) {
-	for(int i=0; i<fsize; i++) {
-		fonts[i] = font[index+i];
-		if (dev->_font_revert) fonts[i] = ~fonts[i];
-		if(_DEBUG_)printf("fonts[%d]=0x%x\n",i, fonts[i]);
-	}
+	// for(int i=0; i<fsize; i++) {
+	// 	fonts[i] = font[index+i];
+	// 	if (dev->_font_revert) fonts[i] = ~fonts[i];
+	// 	if(_DEBUG_)printf("fonts[%d]=0x%x\n",i, fonts[i]);
+	// }
 
 	int16_t xd1 = 0;
 	int16_t yd1 = 0;
@@ -670,28 +671,28 @@ int lcdDrawChar2(TFT_t * dev, uint8_t *font, uint16_t x, uint16_t y, uint8_t asc
 	}
 
 	if(_DEBUG_)printf("xss=%d yss=%d\n",xss,yss);
-	index = 0;
+	
 	yy = yss;
 	xx = xss;
 
-	//for(int h=0;h<ph;h++) {
 	for(int w=0;w<pw;w++) {
 		if(xsd) xx = xss;
 		if(ysd) yy = yss;
-		mask = 0x80;
-		for(int bit=0;bit<8;bit++) {
-			if(_DEBUG_)printf("xx=%d yy=%d xd1=%x yd2=%d mask=%02x fonts[%d]=%02x\n",
-			xx, yy, xd1, yd2, mask, index, fonts[index]);
-			if (fonts[index] & mask) {
-				lcdDrawPixel(dev, xx, yy, BLACK);
-			} else {
-				lcdDrawPixel(dev, xx, yy, WHITE);
+		for(int h=0;h<ph/8;h++) {
+			if(_DEBUG_)printf("boop00");
+			mask = 0x80;
+			for(int bit=0;bit<8;bit++) {
+				// if(_DEBUG_)printf("xx=%d yy=%d xd1=%x yd2=%d mask=%02x fonts[%d]=%02x\n",
+				// xx, yy, xd1, yd2, mask, index, fonts[index]);
+				if (font[offset+index] & mask) {
+					lcdDrawPixel(dev, xx, yy, color);
+				}
+				xx = xx + xd1;
+				yy = yy + yd2;
+				mask = mask >> 1;
 			}
-			xx = xx + xd1;
-			yy = yy + yd2;
-			mask = mask >> 1;
+			index++;
 		}
-		index++;
 		yy = yy + yd1;
 		xx = xx + xd2;
 	}

@@ -116,7 +116,6 @@ menu "ST7565 Configuration"
 	config GPIO_INPUT_0
         int "GPIO input pin 0"
         range 0 GPIO_RANGE_MAX
-        range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
         default 0
         help
             GPIO pin number to be used as GPIO_INPUT_IO_0.
