@@ -228,9 +228,9 @@ void catface_task(void *pvParameters)
 	}
 }
 
+/*
 void cargotchi_task(void *pvParameters)
 {
-	/*
 		Monsters are born as babies
 			- idle (2 states, bouncing around the screen)
 			- must be given gas to turn into adult
@@ -249,8 +249,13 @@ void cargotchi_task(void *pvParameters)
 		on death they revert to a baby after hatching
 
 		state is stored on file system?
-	*/
 }
+*/
+
+// Have a CAN task that is high priority that keeps state data for the speedometer and cat face
+// it's priority will be the highest, but waiting for a CAN messages by pending on a queue
+// it's helpers that actually wait for data will be a level lower but just wait for CAN data
+
 
 void app_main(void)
 {

@@ -2,92 +2,67 @@
 // helper file for catface
 #include "catface_helper.h"
 
-static void both_eyes_open_forward(TFT_t * dev)
-{
-	uint8_t ascii[40];
-
-	lcdSetFontDirection(dev, DIRECTION0);
-	ascii[0] = 0x2;
-	ascii[1] = 0x1;
-	ascii[2] = 0x2;
-	ascii[3] = 0x0;
-	// strcpy((char *)ascii, "\u0002\u0001\u0001\u0002");
-
-	// Complete one calulation and return, save state persitantly to survive thread being stopped
-	int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 32)) / 2;
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, BLACK);
-	lcdWriteBuffer(dev);
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, WHITE);
-}
-
-static void both_eyes_open_right(TFT_t * dev)
-{
-	uint8_t ascii[40];
-
-	lcdSetFontDirection(dev, DIRECTION0);
-	// strcpy((char *)ascii, "^  ^");
-	ascii[0] = 0x5;
-	ascii[1] = 0x1;
-	ascii[2] = 0x5;
-	ascii[3] = 0x0;
-
-	// Complete one calulation and return, save state persitantly to survive thread being stopped
-	int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 32)) / 2;
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, BLACK);
-	lcdWriteBuffer(dev);
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, WHITE);
-}
-
-static void both_eyes_open_left(TFT_t * dev)
-{
-	uint8_t ascii[40];
-
-	lcdSetFontDirection(dev, DIRECTION0);
-	// strcpy((char *)ascii, "^  ^");
-	ascii[0] = 0x4;
-	ascii[1] = 0x1;
-	ascii[2] = 0x4;
-	ascii[3] = 0x0;
-
-	// Complete one calulation and return, save state persitantly to survive thread being stopped
-	int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 32)) / 2;
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, BLACK);
-	lcdWriteBuffer(dev);
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, WHITE);
-}
-
-static void both_eyes_closed(TFT_t * dev)
-{
-	uint8_t ascii[40];
-
-	lcdSetFontDirection(dev, DIRECTION0);
-	// strcpy((char *)ascii, "^  ^");
-	ascii[0] = 0x3;
-	ascii[1] = 0x1;
-	ascii[2] = 0x3;
-	ascii[3] = 0x0;
-
-	// Complete one calulation and return, save state persitantly to survive thread being stopped
-	int xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 32)) / 2;
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, BLACK);
-	lcdWriteBuffer(dev);
-	lcdDrawString2(dev, font32x32, xpos, 50, ascii, WHITE);
-}
-
-enum cat_states {
-	s_both_eyes_open_forward = 0,
-	s_both_eyes_open_right,
-	s_both_eyes_open_left,
-	s_blink,
+enum cat_expressions {
+	EYES_OPEN_FOWARD = 0,
+	EYES_OPEN_RIGHT,
+	EYES_OPEN_LEFT,
+	EYES_CLOSED,
 };
 
-static int cat_state = s_blink;
-static uint32_t state_tick = 0;
+enum cat_effects {
+	NO_EFFECT = 0;
+}
+
+void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect)
+{
+	uint32_t xpos = 0;
+	uint8_t ascii[40];
+
+	lcdSetFontDirection(dev, DIRECTION0);
+
+	switch(base_expression)
+	{
+		case EYES_OPEN_FOWARD:
+			ascii[0] = 0x2;
+			ascii[1] = 0x1;
+			ascii[2] = 0x2;
+			ascii[3] = 0x0;
+			break;
+		case EYES_OPEN_RIGHT:
+			ascii[0] = 0x5;
+			ascii[1] = 0x1;
+			ascii[2] = 0x5;
+			ascii[3] = 0x0;
+			break;
+		case EYES_OPEN_LEFT:
+			ascii[0] = 0x4;
+			ascii[1] = 0x1;
+			ascii[2] = 0x4;
+			ascii[3] = 0x0;
+			break;
+		case EYES_CLOSED:
+			ascii[0] = 0x3;
+			ascii[1] = 0x1;
+			ascii[2] = 0x3;
+			ascii[3] = 0x0;
+			break;
+	}
+
+	// Complete one calulation and return, save state persitantly to survive thread being stopped
+	xpos = (CONFIG_WIDTH - (strlen((char *)ascii) * 32)) / 2;
+	lcdDrawString2(dev, font32x32, xpos, 50, ascii, BLACK);
+	lcdWriteBuffer(dev);
+	lcdDrawString2(dev, font32x32, xpos, 50, ascii, WHITE);
+}
+
+static int32_t cat_expression = EYES_CLOSED;
 static int64_t t1 = 0;
 static int64_t t2 = 0;
 
 void catface_helper(TFT_t * dev)
 {
+	uint32_t state_tick = 0;
+
 	/*
 		Each state, besides the eyes being closed, keep a random amount of time they keep track of
 		when the tick could expires the eyes close for a set amount and a random state is entered
@@ -99,34 +74,35 @@ void catface_helper(TFT_t * dev)
 	t2 = esp_timer_get_time();
 	if (t1 + state_tick <= t2) {
 		
-		// blink
-		if (cat_state == s_blink) {
+		if (cat_expression == EYES_CLOSED) {
 			// blink is always the last defined enum so the states will always be size of possbile states - 1
-			cat_state = esp_random() % s_blink;
+			cat_expression = esp_random() % EYES_CLOSED;
+			// This is where a cat face state helper could be queried
+			// cat_expression = get_global_cat_state();
 		}
-		else cat_state = s_blink;
+		else cat_expression = EYES_CLOSED;
 
-		switch(cat_state)
+		switch(cat_expression)
 		{
-		case s_both_eyes_open_forward:
+		case EYES_OPEN_FOWARD:
 			// 1,000,000 is about 1.0s
 			state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-			both_eyes_open_forward(dev);
+			change_expression(dev, EYES_OPEN_FOWARD, NO_EFFECT);
 			break;
-		case s_both_eyes_open_right:
+		case EYES_OPEN_RIGHT:
 			// 1,000,000 is about 1.0s
 			state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-			both_eyes_open_right(dev);
+			change_expression(dev, EYES_OPEN_RIGHT, NO_EFFECT);
 			break;
-		case s_both_eyes_open_left:
+		case EYES_OPEN_LEFT:
 			// 1,000,000 is about 1.0s
 			state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-			both_eyes_open_left(dev);
+			change_expression(dev, EYES_OPEN_LEFT, NO_EFFECT);
 			break;
-		case s_blink:
+		case EYES_CLOSED:
 			// average time of a blink is 100-150 ms
 			state_tick = 150000;
-			both_eyes_closed(dev);
+			change_expression(dev, EYES_CLOSED, NO_EFFECT);
 			break;
 		}
 	t1 = esp_timer_get_time();
