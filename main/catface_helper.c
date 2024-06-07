@@ -60,7 +60,7 @@ void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect)
 
 void catface_helper(TFT_t * dev)
 {
-	lcdFillScreen(l_dev, WHITE);
+	lcdFillScreen(dev, WHITE);
 
 	for(;;) {
 		t2 = esp_timer_get_time();
