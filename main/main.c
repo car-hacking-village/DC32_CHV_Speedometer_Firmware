@@ -20,6 +20,7 @@
 #include "spiffs_helper.h"
 #include "display_helper.h"
 #include "catface_helper.h"
+#include "speedometer_helper.h"
 
 // #define	INTERVAL 400
 // #define WAIT vTaskDelay(INTERVAL)
@@ -54,33 +55,6 @@ char *dickbutt[] = {
 	"/spiffs/00025.bmp",
 };
 
-static uint16_t speed_entries = 169;
-
-uint16_t speed_array[169][2] = {
-	{1,59}, {1,58}, {1,57}, {1,56}, {2,55}, {2,54}, {2,53}, {2,52}, 
-	{2,51}, {2,50}, {3,49}, {3,48}, {3,47}, {3,46}, {4,45}, {4,44}, 
-	{4,43}, {5,42}, {5,41}, {5,40}, {6,39}, {6,38}, {7,37}, {7,36}, 
-	{8,35}, {8,34}, {9,33}, {9,32}, {10,31}, {11,30}, {11,29}, {12,28}, 
-	{13,27}, {13,26}, {14,25}, {15,24}, {16,23}, {16,22}, {17,21}, {18,20}, 
-	{19,19}, {20,18}, {21,17}, {22,16}, {23,16}, {24,15}, {25,14}, {26,13}, 
-	{27,13}, {28,12}, {29,11}, {30,11}, {31,10}, {32,9}, {33,9}, {34,8}, 
-	{35,8}, {36,7}, {37,7}, {38,6}, {39,6}, {40,5}, {41,5}, {42,5}, 
-	{43,4}, {44,4}, {45,4}, {46,3}, {47,3}, {48,3}, {49,3}, {50,2}, 
-	{51,2}, {52,2}, {53,2}, {54,2}, {55,2}, {56,1}, {57,1}, {58,1}, 
-	{59,1}, {60,1}, {61,1}, {62,1}, {63,1}, {64,1}, {65,1}, {66,1}, 
-	{67,1}, {68,1}, {69,1}, {70,1}, {71,2}, {72,2}, {73,2}, {74,2}, 
-	{75,2}, {76,2}, {77,3}, {78,3}, {79,3}, {80,3}, {81,4}, {82,4}, 
-	{83,4}, {84,5}, {85,5}, {86,5}, {87,6}, {88,6}, {89,7}, {90,7}, 
-	{91,8}, {92,8}, {93,9}, {94,9}, {95,10}, {96,11}, {97,11}, {98,12}, 
-	{99,13}, {100,13}, {101,14}, {102,15}, {103,16}, {104,16}, {105,17}, {106,18},
-	{107,19}, {108,20}, {109,21}, {110,22}, {110,23}, {111,24}, {112,25}, {113,26}, 
-	{113,27}, {114,28}, {115,29}, {115,30}, {116,31}, {117,32}, {117,33}, {118,34}, 
-	{118,35}, {119,36}, {119,37}, {120,38}, {120,39}, {121,40}, {121,41}, {121,42}, 
-	{122,43}, {122,44}, {122,45}, {123,46}, {123,47}, {123,48}, {123,49}, {124,50}, 
-	{124,51}, {124,52}, {124,53}, {124,54}, {124,55}, {125,56}, {125,57}, {125,58}, 
-	{125,59}
-};
-
 static QueueHandle_t gpio_evt_queue = NULL;
 
 static TaskHandle_t catface_t = NULL;
@@ -89,6 +63,7 @@ static TaskHandle_t speedometer_t = NULL;
 
 TFT_t g_dev;
 
+// Soft copy of the device
 TFT_t * copyDisplayInstance(void)
 {
 	TFT_t * t_dev = malloc(sizeof(TFT_t));
@@ -114,7 +89,7 @@ static void task_switch(void *pvParameters)
     for(;;) {
 	   	if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
 
-	   		// Check if the HW is currently in use
+	   		// Check if the HW is currently in use, priority inversion will occur is so
 	        // ESP_LOGI(TAG, "Checking if display is in use...");
 	   		xSemaphoreTake(display_lock, portMAX_DELAY);
 	   		xSemaphoreGive(display_lock);
@@ -129,50 +104,14 @@ static void task_switch(void *pvParameters)
 
 void speedometer(void *pvParameters)
 {
-	// uint16_t cx_center = 63;
-	// uint16_t cy_center = 63;
-
-	uint16_t ax_center = 62;
-	uint16_t ay_center = 59;
-
-	uint16_t t_pos = 0;
-	bool forward = true;
-
 	TFT_t * l_dev =  copyDisplayInstance();
 
 	vTaskSuspend(NULL);
 
-	// As this is the first task this needs to be here, could prolly move this to the main function
 	lcdFillScreen(l_dev, WHITE);
 
-	// Test (which works) this displays hex in pixels on the screen, use this later for displaying the flag
-	uint8_t test_berf[] = {0xFC, 0x35, 0xFC, 0x3F, 0xFC, 0x35, 0xFC, 0x3F, 0x79, 0x1C, 0x66, 0x6B, 0x43, 0x1D, 0xF4, 0xB2};
-	for(int i = 0; i < 16; i++) {
-		l_dev->_buffer[i] = test_berf[i];
-	}
-
-	for(;;) {
-		lcdDrawFillArrow(l_dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, BLACK);
-	 	// write to screen
-	 	lcdWriteBuffer(l_dev);
-	 	// delete last triagle in buffer without drawing, we can save a write doing this
-		lcdDrawFillArrow(l_dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, WHITE);
-
- 		if (forward) {
- 			t_pos++;
- 			if (t_pos >= speed_entries) {
- 				t_pos = speed_entries - 2;
- 				forward = false;
- 			}
- 		}
- 		else {
- 			t_pos--;
- 			if (t_pos >= speed_entries) {
- 				t_pos = 1;
- 				forward = true;
- 			}
- 		}
-	}
+	// Should never return
+	speedometer_helper(l_dev);
 }
 
 void dickbutt_task(void *pvParameters)
@@ -181,7 +120,6 @@ void dickbutt_task(void *pvParameters)
 
 	TFT_t * l_dev = copyDisplayInstance();
 
-	// Wait
 	vTaskSuspend(NULL);
 
 	for(;;) {
@@ -197,7 +135,6 @@ void dickbutt_task(void *pvParameters)
 
 void catface_task(void *pvParameters)
 {
-	// Soft copy of the device
 	TFT_t * l_dev =  copyDisplayInstance();
 
 	vTaskSuspend(NULL);
@@ -241,6 +178,10 @@ void cargotchi_task(void *pvParameters)
 
 void app_main(void)
 {
+	// Lock for display
+	display_lock = xSemaphoreCreateBinary();
+	xSemaphoreGive(display_lock);
+
 	spiffs_init();
 	display_init(&g_dev);
 

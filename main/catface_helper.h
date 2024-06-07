@@ -1,6 +1,9 @@
 
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "esp_random.h"
 #include "esp_timer.h"
 

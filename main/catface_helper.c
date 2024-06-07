@@ -3,8 +3,6 @@
 #include "catface_helper.h"
 
 static int32_t cat_expression = EYES_CLOSED;
-static int64_t t1 = 0;
-static int64_t t2 = 0;
 static uint32_t state_tick = 0;
 
 void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect)
@@ -58,46 +56,46 @@ void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect)
 	image is the same then do not bother redrawing it.
 */
 
+// main task responsible for set up and keeping face active
+
 void catface_helper(TFT_t * dev)
 {
 	lcdFillScreen(dev, WHITE);
 
-	for(;;) {
-		t2 = esp_timer_get_time();
-		if (t1 + state_tick <= t2) {
-			
-			if (cat_expression == EYES_CLOSED) {
-				// blink is always the last defined enum so the states will always be size of possbile states - 1
-				cat_expression = esp_random() % EYES_CLOSED;
-				// This is where a cat face state helper could be queried
-				// cat_expression = get_global_cat_state();
-			}
-			else cat_expression = EYES_CLOSED;
+	// TODO: spin up task to react to different machine states for more emotions
 
-			switch(cat_expression)
-			{
-				case EYES_OPEN_FOWARD:
-					// 1,000,000 is about 1.0s
-					state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-					change_expression(dev, EYES_OPEN_FOWARD, NO_EFFECT);
-					break;
-				case EYES_OPEN_RIGHT:
-					// 1,000,000 is about 1.0s
-					state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-					change_expression(dev, EYES_OPEN_RIGHT, NO_EFFECT);
-					break;
-				case EYES_OPEN_LEFT:
-					// 1,000,000 is about 1.0s
-					state_tick = (esp_random() % (4 * 1000000)) ^ 400000;
-					change_expression(dev, EYES_OPEN_LEFT, NO_EFFECT);
-					break;
-				case EYES_CLOSED:
-					// average time of a blink is 100-150 ms
-					state_tick = 150000;
-					change_expression(dev, EYES_CLOSED, NO_EFFECT);
-					break;
-			}
-		t1 = esp_timer_get_time();
+	for(;;) {
+		if (cat_expression == EYES_CLOSED) {
+			// blink is always the last defined enum so the states will always be size of possbile states - 1
+			cat_expression = esp_random() % EYES_CLOSED;
+			// This is where a cat face state helper could be queried
+			// cat_expression = get_global_cat_state();
 		}
+		else cat_expression = EYES_CLOSED;
+
+		switch(cat_expression)
+		{
+			case EYES_OPEN_FOWARD:
+				// 1,000,000 is about 1.0s
+				state_tick = (esp_random() % (4 * 1000)) ^ 400;
+				change_expression(dev, EYES_OPEN_FOWARD, NO_EFFECT);
+				break;
+			case EYES_OPEN_RIGHT:
+				// 1,000,000 is about 1.0s
+				state_tick = (esp_random() % (4 * 1000)) ^ 400;
+				change_expression(dev, EYES_OPEN_RIGHT, NO_EFFECT);
+				break;
+			case EYES_OPEN_LEFT:
+				// 1,000,000 is about 1.0s
+				state_tick = (esp_random() % (4 * 1000)) ^ 400;
+				change_expression(dev, EYES_OPEN_LEFT, NO_EFFECT);
+				break;
+			case EYES_CLOSED:
+				// average time of a blink is 100-150 ms
+				state_tick = 150;
+				change_expression(dev, EYES_CLOSED, NO_EFFECT);
+				break;
+		}
+		vTaskDelay(state_tick / portTICK_PERIOD_MS);
 	}
 }
