@@ -2,6 +2,7 @@
 #define MAIN_ST7565_H_
 
 #include "driver/spi_master.h"
+#include "freertos/semphr.h"
 
 #define BLACK			0xff
 #define WHITE			0x00
@@ -29,6 +30,8 @@ typedef struct {
 	uint8_t *_buffer;
 	spi_device_handle_t _SPIHandle;
 } TFT_t;
+
+extern SemaphoreHandle_t display_lock;
 
 void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t GPIO_CS, int16_t GPIO_DC, int16_t GPIO_RESET, int16_t GPIO_BL);
 bool spi_master_write_byte(spi_device_handle_t SPIHandle, const uint8_t* Data, size_t DataLength);

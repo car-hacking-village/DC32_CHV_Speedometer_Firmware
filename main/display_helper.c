@@ -179,6 +179,9 @@ TickType_t BMPTest(TFT_t * dev, char * file, int width, int height, bool inverse
 
 void display_init(TFT_t *dev)
 {
+	display_lock = xSemaphoreCreateBinary();
+	xSemaphoreGive(display_lock);
+	
 	spi_master_init(dev, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO, CONFIG_BL_GPIO);
 	lcdInit(dev, CONFIG_WIDTH, CONFIG_HEIGHT);
 

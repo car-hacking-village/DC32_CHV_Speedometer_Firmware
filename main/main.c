@@ -81,70 +81,50 @@ uint16_t speed_array[169][2] = {
 	{125,59}
 };
 
-/*
-
-I imagine this driver is going to need some some better state machines.
-tasks that are not waiting to do something should be a higher priority and have discrete jobs to complete
-I need to use interrupt handlers better to handle high priority stuff
-
-*/
-
-TFT_t dev;
-
 static QueueHandle_t gpio_evt_queue = NULL;
-static QueueHandle_t task_switch_queue = NULL;
 
-static SemaphoreHandle_t catface_sem;
-static SemaphoreHandle_t dickbutt_sem;
-static SemaphoreHandle_t speedometer_sem;
+static TaskHandle_t catface_t = NULL;
+static TaskHandle_t dickbutt_t = NULL;
+static TaskHandle_t speedometer_t = NULL;
 
-// Suspend current task if suspend queue is received
-// Returns true if the barrier returns from being blocked
-bool barrier(SemaphoreHandle_t current_sem) {
-    uint32_t io_num;
+TFT_t g_dev;
 
-    // Wait for GPIO event, checking for a message first and moving on otherwise
-    // The queue needs to return something, so humor it
-    // It is the responsibility of each task to complete one cycle and check if it needs to give up control
-	if(uxQueueMessagesWaiting(gpio_evt_queue) &&
-	   xQueueReceive(gpio_evt_queue, &io_num, 0)) {
-	   	
-	   	// Tell the lower priority switcher there is work to do
-        xQueueSend(task_switch_queue, &current_sem, NULL);
-		// The current task will wait until called again
-	   	xSemaphoreTake(current_sem, portMAX_DELAY);
+TFT_t * copyDisplayInstance(void)
+{
+	TFT_t * t_dev = malloc(sizeof(TFT_t));
+	memcpy(t_dev, &g_dev, sizeof(TFT_t));
 
-	   	return true;
-	}
-	return false;
+	uint8_t * buffer = (uint8_t*)malloc(g_dev._blen);
+	t_dev->_buffer = buffer;
+
+	return t_dev;
 }
+
+#define NUM_MAIN_TASKS 3
 
 static void task_switch(void *pvParameters)
 {
-    SemaphoreHandle_t c_sem;
+    uint32_t io_num;
+
+    uint32_t c_task = 0;
+ 	TaskHandle_t tasks[] = {speedometer_t, catface_t, dickbutt_t};
+
+    vTaskResume(tasks[c_task]);
 
     for(;;) {
-        xQueueReceive(task_switch_queue, &c_sem, portMAX_DELAY);
+	   	if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
 
-		if (c_sem == speedometer_sem) {
-        	ESP_LOGI(TAG, "GIVE catface_sem");
-    		xSemaphoreGive(catface_sem);
-    	}
+	   		// Check if the HW is currently in use
+	        // ESP_LOGI(TAG, "Checking if display is in use...");
+	   		xSemaphoreTake(display_lock, portMAX_DELAY);
+	   		xSemaphoreGive(display_lock);
 
-		else if (c_sem == catface_sem) {
-        	ESP_LOGI(TAG, "GIVE dickbutt_sem");
-    		xSemaphoreGive(dickbutt_sem);
-    	}
-
-        else if (c_sem == dickbutt_sem) {
-        	ESP_LOGI(TAG, "GIVE speedometer_sem");
-    		xSemaphoreGive(speedometer_sem);
-        }
-
-    	else {
-        	ESP_LOGI(TAG, "PROBLEM");
-    	}
-    }
+	    	vTaskSuspend(tasks[c_task]);
+	    	c_task = (c_task + 1) % NUM_MAIN_TASKS;
+	        ESP_LOGI(TAG, "Switching task to %d", c_task);
+	    	vTaskResume(tasks[c_task]);
+	    }
+	}
 }
 
 void speedometer(void *pvParameters)
@@ -158,27 +138,25 @@ void speedometer(void *pvParameters)
 	uint16_t t_pos = 0;
 	bool forward = true;
 
+	TFT_t * l_dev =  copyDisplayInstance();
+
+	vTaskSuspend(NULL);
+
 	// As this is the first task this needs to be here, could prolly move this to the main function
-	lcdFillScreen(&dev, WHITE);
+	lcdFillScreen(l_dev, WHITE);
 
 	// Test (which works) this displays hex in pixels on the screen, use this later for displaying the flag
 	uint8_t test_berf[] = {0xFC, 0x35, 0xFC, 0x3F, 0xFC, 0x35, 0xFC, 0x3F, 0x79, 0x1C, 0x66, 0x6B, 0x43, 0x1D, 0xF4, 0xB2};
 	for(int i = 0; i < 16; i++) {
-		dev._buffer[i] = test_berf[i];
+		l_dev->_buffer[i] = test_berf[i];
 	}
 
 	for(;;) {
-		// This clears the screen of the previous stuff
-		if(barrier(speedometer_sem)) {
-			// Only needs to be drawn once
-			lcdFillScreen(&dev, WHITE);
-		}
-
-		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, BLACK);
+		lcdDrawFillArrow(l_dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, BLACK);
 	 	// write to screen
-	 	lcdWriteBuffer(&dev);
+	 	lcdWriteBuffer(l_dev);
 	 	// delete last triagle in buffer without drawing, we can save a write doing this
-		lcdDrawFillArrow(&dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, WHITE);
+		lcdDrawFillArrow(l_dev, ax_center, ay_center, speed_array[t_pos][0], speed_array[t_pos][1], 2, WHITE);
 
  		if (forward) {
  			t_pos++;
@@ -201,31 +179,31 @@ void dickbutt_task(void *pvParameters)
 {
 	char file[32];
 
+	TFT_t * l_dev = copyDisplayInstance();
+
 	// Wait
-	xSemaphoreTake(dickbutt_sem, portMAX_DELAY);
+	vTaskSuspend(NULL);
 
 	for(;;) {
 		for (uint32_t i = 0; i < 25; i++) {
 			// No need for clearing the screen as the animation will over write the entire screen
-			barrier(dickbutt_sem);
+			// barrier(dickbutt_sem);
 
 			strcpy(file, dickbutt[i]);
-			BMPTest(&dev, file, CONFIG_WIDTH, CONFIG_HEIGHT, true);
+			BMPTest(l_dev, file, CONFIG_WIDTH, CONFIG_HEIGHT, true);
 		}
 	}
 }
 
 void catface_task(void *pvParameters)
 {
-	xSemaphoreTake(catface_sem, portMAX_DELAY);
+	// Soft copy of the device
+	TFT_t * l_dev =  copyDisplayInstance();
 
-	for(;;) {
-		if(barrier(catface_sem)) {
-			// screen requires being wiped on return
-			lcdFillScreen(&dev, WHITE);
-		}
-		catface_helper(&dev);
-	}
+	vTaskSuspend(NULL);
+
+	// This shold never return
+	catface_helper(l_dev);
 }
 
 /*
@@ -256,37 +234,34 @@ void cargotchi_task(void *pvParameters)
 // it's priority will be the highest, but waiting for a CAN messages by pending on a queue
 // it's helpers that actually wait for data will be a level lower but just wait for CAN data
 
+// each state that cares about CAN messages can check to see if there is a message it cares about in a dedicated
+// task that it stops 
+
+
 
 void app_main(void)
 {
 	spiffs_init();
-	display_init(&dev);
+	display_init(&g_dev);
 
-	task_switch_queue = xQueueCreate(1, sizeof(SemaphoreHandle_t));	
 	gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));	
-
-	catface_sem = xSemaphoreCreateBinary();
-	dickbutt_sem = xSemaphoreCreateBinary();
-	speedometer_sem = xSemaphoreCreateBinary();
 
 	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
 	gpio_interrupt_init(&gpio_evt_queue);
 
 	ESP_LOGI(TAG, "Spinning up dickbutt task");
-	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, 9, NULL);
+	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, 9, &dickbutt_t);
 
 	ESP_LOGI(TAG, "Spinning up catface task");
-	xTaskCreate(catface_task, "catface", 1024*6, NULL, 9, NULL);
+	xTaskCreate(catface_task, "catface", 1024*6, NULL, 9, &catface_t);
 
 	ESP_LOGI(TAG, "Spinning up speedometer task");
-	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, 9, NULL);
+	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, 9, &speedometer_t);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others
 	ESP_LOGI(TAG, "Spinning up task_switch task");
-    xTaskCreate(task_switch, "task_switch", 2048, NULL, 8, NULL);
-
-	xSemaphoreGive(speedometer_sem);
+    xTaskCreate(task_switch, "task_switch", 2048, NULL, 10, NULL);
 
     while(1) {
         vTaskDelay(portMAX_DELAY);

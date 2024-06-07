@@ -28,6 +28,7 @@ static const int SPI_Frequency = SPI_MASTER_FREQ_8M;
 //static const int SPI_Frequency = SPI_MASTER_FREQ_40M;
 //static const int SPI_Frequency = SPI_MASTER_FREQ_80M;
 
+SemaphoreHandle_t display_lock;
 
 void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t GPIO_CS, int16_t GPIO_DC, int16_t GPIO_RESET, int16_t GPIO_BL)
 {
@@ -129,24 +130,48 @@ bool spi_master_write_byte(spi_device_handle_t SPIHandle, const uint8_t* Data, s
 
 bool spi_master_write_command(TFT_t * dev, uint8_t cmd)
 {
+	bool ret = false;
 	static uint8_t Byte = 0;
 	Byte = cmd;
+
+	xSemaphoreTake(display_lock, portMAX_DELAY);
+
 	gpio_set_level( dev->_dc, SPI_Command_Mode );
-	return spi_master_write_byte( dev->_SPIHandle, &Byte, 1 );
+	ret = spi_master_write_byte( dev->_SPIHandle, &Byte, 1 );
+
+	xSemaphoreGive(display_lock);
+
+	return ret;
 }
 
 bool spi_master_write_data(TFT_t * dev, uint8_t * data, int16_t len)
 {
+	bool ret = false;
+
+	xSemaphoreTake(display_lock, portMAX_DELAY);
+
 	gpio_set_level( dev->_dc, SPI_Data_Mode );
-	return spi_master_write_byte( dev->_SPIHandle, data, len );
+	ret = spi_master_write_byte( dev->_SPIHandle, data, len );
+
+	xSemaphoreGive(display_lock);
+
+	return ret;
 }
 
 bool spi_master_write_data_byte(TFT_t * dev, uint8_t data)
 {
+	bool ret = false;
 	static uint8_t Byte = 0;
 	Byte = data;
+
+	xSemaphoreTake(display_lock, portMAX_DELAY);
+
 	gpio_set_level( dev->_dc, SPI_Data_Mode );
-	return spi_master_write_byte( dev->_SPIHandle, &Byte, 1 );
+	ret = spi_master_write_byte( dev->_SPIHandle, &Byte, 1 );
+
+	xSemaphoreGive(display_lock);
+
+	return ret;
 }
 
 
@@ -169,12 +194,6 @@ void lcdInit(TFT_t * dev, int width, int height)
 
 	dev->_blen = width * height / 8;
 	ESP_LOGD(TAG, "dev->_blen=%d", dev->_blen);
-	uint8_t *buffer = (uint8_t*)malloc(dev->_blen);
-	dev->_buffer = buffer;
-
-	// for(int i = 0; i < dev->_blen; i++) {
-	// 	ESP_LOGI(TAG, "0x%x", buffer[i]);
-	// }
 
 	// These values are good for 3.3V Vcc
 	spi_master_write_command(dev, 0xe2); // system reset
