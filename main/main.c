@@ -12,6 +12,8 @@
 
 #include "st7565.h"
 #include "bmpfile.h"
+#include "can_helper.h"
+#include "speedometer.h"
 // #include "font6x8.h"
 // #include "font8x8.h"
 // #include "font8x8_bold.h"
@@ -75,6 +77,23 @@ TFT_t * copyDisplayInstance(void)
 	return t_dev;
 }
 
+// send CAN to the task that is currently active
+// each helper has it's own unique queue 
+// TODO 
+void can_splitter(void *pvParameters)
+{
+	twai_message_t rx_msg;
+
+	for(;;) {
+		// TODO, switch to a main can handler, to send messages to all the can helpers,
+		// this is better as we can then maybe ave more complicated behavior based on traffic
+
+		can_recv(&rx_msg)
+		ESP_LOGI(SPD_TAG, "Message Received");
+		xQueueSend(can_queue, rx_msg, portMAX_DELAY);
+	}
+}
+
 #define NUM_MAIN_TASKS 3
 
 static void task_switch(void *pvParameters)
@@ -95,6 +114,11 @@ static void task_switch(void *pvParameters)
 	   		xSemaphoreGive(display_lock);
 
 	    	vTaskSuspend(tasks[c_task]);
+
+	    	// Send a NULL CAN message to kick the task helper off and wait to send a message
+	    	// May need to time out on this
+	    	xQueueSend(can_rx_queue, NULL, 100);
+
 	    	c_task = (c_task + 1) % NUM_MAIN_TASKS;
 	        ESP_LOGI(TAG, "Switching task to %d", c_task);
 	    	vTaskResume(tasks[c_task]);
@@ -182,6 +206,9 @@ void app_main(void)
 	display_lock = xSemaphoreCreateBinary();
 	xSemaphoreGive(display_lock);
 
+	can_read_lock = xSemaphoreCreateBinary();
+	xSemaphoreGive(display_lock);
+
 	spiffs_init();
 	display_init(&g_dev);
 
@@ -191,18 +218,18 @@ void app_main(void)
 	gpio_interrupt_init(&gpio_evt_queue);
 
 	ESP_LOGI(TAG, "Spinning up dickbutt task");
-	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, 9, &dickbutt_t);
+	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, DIK_TASK_PRIO, &dickbutt_t);
 
 	ESP_LOGI(TAG, "Spinning up catface task");
-	xTaskCreate(catface_task, "catface", 1024*6, NULL, 9, &catface_t);
+	xTaskCreate(catface_task, "catface", 1024*6, NULL, CAT_TASK_PRIO, &catface_t);
 
 	ESP_LOGI(TAG, "Spinning up speedometer task");
-	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, 9, &speedometer_t);
+	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, SPD_TASK_PRIO, &speedometer_t);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others
 	ESP_LOGI(TAG, "Spinning up task_switch task");
-    xTaskCreate(task_switch, "task_switch", 2048, NULL, 10, NULL);
+    xTaskCreate(task_switch, "task_switch", 2048, NULL, SWT_TASK_PRIO, NULL);
 
     while(1) {
         vTaskDelay(portMAX_DELAY);
