@@ -5,32 +5,18 @@
 static int32_t cat_expression = EYES_CLOSED;
 static uint32_t state_tick = 0;
 
-static QueueHandle_t can_queue = NULL;
+QueueHandle_t cat_can_queue = NULL;
 
 void catface_can_helper(void *pvParameters)
 {
 	twai_message_t rx_msg;
 
-	for(;;) {
-		can_recv(&rx_msg)
-		ESP_LOGI(SPD_TAG, "Message Received");
-		xQueueSend(can_queue, rx_msg, portMAX_DELAY);
-		if (rx_msg == NULL) {
-			// A NULL may mean were being told to shut down, this may be overkill
-			continue;
-		}
-	}
-}
-
-void wait_for_update()
-{
-	twai_message_t rx_msg;
-
 	for (;;) {
-		if (xQueueReceive(can_queue, &rx_msg, portMAX_DELAY)) {
-			if (rx_msg == NULL){			// Could mean the task just got woke up again
+		ESP_LOGI(CAT_TAG, "Got message from the CAN distributer");
+		if (xQueueReceive(cat_can_queue, &rx_msg, portMAX_DELAY)) {
+			// if (rx_msg == NULL){			// Could mean the task just got woke up again
 				continue;
-			}
+			// }
 		}
 	}
 }
@@ -90,12 +76,11 @@ void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect)
 
 void catface_helper(TFT_t * dev)
 {
-	ESP_LOGI(SPD_TAG, "Spinning up speedometer can helper task");
-	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, NULL);
-
 	lcdFillScreen(dev, WHITE);
 
-	can_queue = xQueueCreate(1, sizeof(uint16_t));
+
+	ESP_LOGI(CAT_TAG, "Spinning up speedometer can helper task");
+	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, NULL);
 
 	// TODO: spin up task to react to different machine states for more emotions
 

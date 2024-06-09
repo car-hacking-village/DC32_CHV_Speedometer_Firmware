@@ -57,6 +57,8 @@ char *dickbutt[] = {
 	"/spiffs/00025.bmp",
 };
 
+static uint32_t current_task = 0;
+
 static QueueHandle_t gpio_evt_queue = NULL;
 
 static TaskHandle_t catface_t = NULL;
@@ -79,49 +81,56 @@ TFT_t * copyDisplayInstance(void)
 
 // send CAN to the task that is currently active
 // each helper has it's own unique queue 
-// TODO 
-void can_splitter(void *pvParameters)
+void can_share_task(void *pvParameters)
 {
 	twai_message_t rx_msg;
+	QueueHandle_t task_cans[] = {spd_can_queue, cat_can_queue, NULL};
+
+	twai_init();
+
+	spd_can_queue = xQueueCreate(5, sizeof(twai_message_t));
+	cat_can_queue = xQueueCreate(5, sizeof(twai_message_t));
 
 	for(;;) {
-		// TODO, switch to a main can handler, to send messages to all the can helpers,
-		// this is better as we can then maybe ave more complicated behavior based on traffic
-
-		can_recv(&rx_msg)
-		ESP_LOGI(SPD_TAG, "Message Received");
-		xQueueSend(can_queue, rx_msg, portMAX_DELAY);
-	}
+		can_recv(&rx_msg);
+		ESP_LOGI(TAG, "CAN Message Received");
+		if (task_cans[current_task] != NULL) {
+			xQueueSend(task_cans[current_task], &rx_msg, 150);
+		}
+  	}
 }
 
 #define NUM_MAIN_TASKS 3
 
 static void task_switch(void *pvParameters)
 {
-    uint32_t io_num;
+    uint32_t dummy_var;
 
-    uint32_t c_task = 0;
- 	TaskHandle_t tasks[] = {speedometer_t, catface_t, dickbutt_t};
+    twai_message_t dummy_can = {
+    	.data_length_code = 0xff,
+    };
 
-    vTaskResume(tasks[c_task]);
+ 	TaskHandle_t task_list[] = {speedometer_t, catface_t, dickbutt_t};
+
+    vTaskResume(task_list[current_task]);
 
     for(;;) {
-	   	if (xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+	   	if (xQueueReceive(gpio_evt_queue, &dummy_var, portMAX_DELAY)) {
 
 	   		// Check if the HW is currently in use, priority inversion will occur is so
 	        // ESP_LOGI(TAG, "Checking if display is in use...");
 	   		xSemaphoreTake(display_lock, portMAX_DELAY);
 	   		xSemaphoreGive(display_lock);
 
-	    	vTaskSuspend(tasks[c_task]);
+	    	vTaskSuspend(task_list[current_task]);
 
 	    	// Send a NULL CAN message to kick the task helper off and wait to send a message
 	    	// May need to time out on this
-	    	xQueueSend(can_rx_queue, NULL, 100);
+	    	xQueueSend(can_rx_queue, &dummy_can, 150);
 
-	    	c_task = (c_task + 1) % NUM_MAIN_TASKS;
-	        ESP_LOGI(TAG, "Switching task to %d", c_task);
-	    	vTaskResume(tasks[c_task]);
+	    	current_task = (current_task + 1) % NUM_MAIN_TASKS;
+	        ESP_LOGI(TAG, "Switching task to %d", current_task);
+	    	vTaskResume(task_list[current_task]);
 	    }
 	}
 }
@@ -225,6 +234,9 @@ void app_main(void)
 
 	ESP_LOGI(TAG, "Spinning up speedometer task");
 	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, SPD_TASK_PRIO, &speedometer_t);
+
+	ESP_LOGI(TAG, "Spinning up can_share_task task");
+    xTaskCreate(can_share_task, "can_share_task", 2048, NULL, CSH_TASK_PRIO, NULL);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others
