@@ -27,7 +27,7 @@
 // #define	INTERVAL 400
 // #define WAIT vTaskDelay(INTERVAL)
 
-static const char *TAG = "MAIN";
+static const char *MAIN_TAG = "MAIN";
 
 char *dickbutt[] = {
 	"/spiffs/00001.bmp",
@@ -84,7 +84,7 @@ TFT_t * copyDisplayInstance(void)
 void can_share_task(void *pvParameters)
 {
 	twai_message_t rx_msg;
-	QueueHandle_t task_cans[] = {spd_can_queue, cat_can_queue, NULL};
+	QueueHandle_t task_quwu[] = {spd_can_queue, cat_can_queue, NULL};
 
 	twai_init();
 
@@ -93,14 +93,12 @@ void can_share_task(void *pvParameters)
 
 	for(;;) {
 		can_recv(&rx_msg);
-		ESP_LOGI(TAG, "CAN Message Received");
-		if (task_cans[current_task] != NULL) {
-			xQueueSend(task_cans[current_task], &rx_msg, 150);
+		ESP_LOGI(MAIN_TAG, "CAN Message Received");
+		if (task_quwu[current_task] != NULL) {
+			xQueueSend(task_quwu[current_task], &rx_msg, 150);
 		}
   	}
 }
-
-#define NUM_MAIN_TASKS 3
 
 static void task_switch(void *pvParameters)
 {
@@ -118,7 +116,6 @@ static void task_switch(void *pvParameters)
 	   	if (xQueueReceive(gpio_evt_queue, &dummy_var, portMAX_DELAY)) {
 
 	   		// Check if the HW is currently in use, priority inversion will occur is so
-	        // ESP_LOGI(TAG, "Checking if display is in use...");
 	   		xSemaphoreTake(display_lock, portMAX_DELAY);
 	   		xSemaphoreGive(display_lock);
 
@@ -129,7 +126,7 @@ static void task_switch(void *pvParameters)
 	    	xQueueSend(can_rx_queue, &dummy_can, 150);
 
 	    	current_task = (current_task + 1) % NUM_MAIN_TASKS;
-	        ESP_LOGI(TAG, "Switching task to %d", current_task);
+	        ESP_LOGI(MAIN_TAG, "Switching task to %d", current_task);
 	    	vTaskResume(task_list[current_task]);
 	    }
 	}
@@ -200,15 +197,6 @@ void cargotchi_task(void *pvParameters)
 }
 */
 
-// Have a CAN task that is high priority that keeps state data for the speedometer and cat face
-// it's priority will be the highest, but waiting for a CAN messages by pending on a queue
-// it's helpers that actually wait for data will be a level lower but just wait for CAN data
-
-// each state that cares about CAN messages can check to see if there is a message it cares about in a dedicated
-// task that it stops 
-
-
-
 void app_main(void)
 {
 	// Lock for display
@@ -223,24 +211,24 @@ void app_main(void)
 
 	gpio_evt_queue = xQueueCreate(1, sizeof(uint32_t));	
 
-	ESP_LOGI(TAG, "Initializing GPIO (BOOT) interrupt");
+	ESP_LOGI(MAIN_TAG, "Initializing GPIO (BOOT) interrupt");
 	gpio_interrupt_init(&gpio_evt_queue);
 
-	ESP_LOGI(TAG, "Spinning up dickbutt task");
+	ESP_LOGI(MAIN_TAG, "Spinning up dickbutt task");
 	xTaskCreate(dickbutt_task, "dickbutt", 1024*6, NULL, DIK_TASK_PRIO, &dickbutt_t);
 
-	ESP_LOGI(TAG, "Spinning up catface task");
+	ESP_LOGI(MAIN_TAG, "Spinning up catface task");
 	xTaskCreate(catface_task, "catface", 1024*6, NULL, CAT_TASK_PRIO, &catface_t);
 
-	ESP_LOGI(TAG, "Spinning up speedometer task");
+	ESP_LOGI(MAIN_TAG, "Spinning up speedometer task");
 	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, SPD_TASK_PRIO, &speedometer_t);
 
-	ESP_LOGI(TAG, "Spinning up can_share_task task");
+	ESP_LOGI(MAIN_TAG, "Spinning up can_share_task task");
     xTaskCreate(can_share_task, "can_share_task", 2048, NULL, CSH_TASK_PRIO, NULL);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others
-	ESP_LOGI(TAG, "Spinning up task_switch task");
+	ESP_LOGI(MAIN_TAG, "Spinning up task_switch task");
     xTaskCreate(task_switch, "task_switch", 2048, NULL, SWT_TASK_PRIO, NULL);
 
     while(1) {

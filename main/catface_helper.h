@@ -10,6 +10,8 @@
 
 #include "st7565.h"
 #include "can_helper.h"
+#include "cat_battle_msgs.h"
+#include "speedometer.h"
 
 #include "font6x8.h"
 #include "font8x16.h"
@@ -29,7 +31,16 @@ enum cat_effects {
 	NO_EFFECT = 0,
 };
 
+enum cat_32_32_syms {
+	SYM_32_NULL	= 0x0,
+	SYM_32_SPAC = 0x1,
+	SYM_32_OFWD = 0x2,
+	SYM_32_CLSD = 0x3,
+	SYM_32_OLFT = 0x4,
+	SYM_32_ORHT = 0x5,
+};
+
 extern QueueHandle_t cat_can_queue;
 
-void change_expression(TFT_t * dev, uint32_t base_expression, uint32_t effect);
+void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect);
 void catface_helper(TFT_t * dev);
