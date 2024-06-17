@@ -52,6 +52,6 @@ bool didWinRPS(uint8_t my_rps, uint8_t tar_rps)
 	2 - 0 =  0 L
 	2 - 1 =  1 W
 	*/
-	uint8_t tmp = (int8_t)my_rps - (int8_t)tar_rps;
+	int8_t tmp = (int8_t)my_rps - (int8_t)tar_rps;
 	return ((tmp == 1) || (tmp == -2));
 }
