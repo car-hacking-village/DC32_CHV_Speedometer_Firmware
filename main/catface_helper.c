@@ -6,21 +6,24 @@ static uint32_t state_tick = 0;
 static uint32_t cat_state = CAT_IDLE;
 static uint32_t cat_expression = EYES_CLOSED;
 
+TaskHandle_t catface_t = NULL;
 QueueHandle_t cat_can_queue = NULL;
 
 uint32_t speed = 0;
+static uint8_t effect = 0;
 
-static bool amSender = true;
+static bool amSender 		= true;
 static uint8_t my_id;
-static uint8_t target_id = 0;
-static uint8_t my_rps = 0;
+static uint8_t target_id 	= 0;
+static uint8_t my_rps 		= RPS_NONE;
+static uint8_t their_rps 	= RPS_NONE;
 
 void logic_as_sender(twai_message_t rx_msg)
 {
-	switch (rx_msg.data[1]){
+	switch (rx_msg.data[0]){
 	// We hear a ping response, we are now the sender, begin challenge
 	case BATTL_PRSP:
-		amSender = true;
+		// amSender = true;
 		target_id = rx_msg.data[1];
 		// Goto challenge
 		cat_state = CAT_CHAL;
@@ -33,11 +36,11 @@ void logic_as_sender(twai_message_t rx_msg)
 
 	case BATTL_RRSP:
 		// Determine from response if we are sending still
-		if (!didWinRPS(my_rps, rx_msg.data[2]))
-			amSender = false;
+		their_rps = rx_msg.data[2];
+		// if (!didWinRPS(my_rps, their_rps))
+		// 	amSender = false;
 
-		// CAT BATTLE TIME
-		cat_state = CAT_BATL;
+		cat_state = CAT_RPSR;
 		break;
 
 	default:
@@ -51,38 +54,39 @@ void logic_as_receiver(twai_message_t rx_msg)
 	uint32_t t_arb = BATTL_ARBID_SENDR;
 
 	switch (rx_msg.data[0]){
-
 	// We hear a ping send, we will now establish as a receiver 
 	case BATTL_PSND:
+		if (rx_msg.data[1] == my_id) return;
+		ESP_LOGI(CAT_TAG, "RCV a ping, switching to receiver");
+		target_id = rx_msg.data[1];;
 		amSender = false;
-		target_id = rx_msg.data[1];
 		send_ping(t_arb, BATTL_PRSP, my_id);
 		// Goto challenge
 		cat_state = CAT_CHAL;
 		break;
 
 	case BATTL_CSND:
+		if (rx_msg.data[1] != my_id) return;
 		// TODO: send key to modify traffic
 		send_challenge(t_arb, target_id, BATTL_CRSP);
 		// Goto rock paper scissors
 		cat_state = CAT_RSPS;
+		// TODO: kick the display task, may need to make another thread for it
+		
 		break;
 
 	// Todo: to garuntee winning RPS you can cheat if you are the receiver
 	case BATTL_RSND:
+		if (rx_msg.data[1] != my_id) return;
+
 		my_rps = get_rps();
 
 		// Make sure our value is not the same
 		// We can cheat here
-		while (my_rps == rx_msg.data[2])
+		their_rps = rx_msg.data[2];
+		while (my_rps == their_rps)
 			my_rps = get_rps();
 
-		send_rps(t_arb, target_id, BATTL_RRSP, my_rps);
-
-		if (didWinRPS(my_rps, rx_msg.data[2]))
-			amSender = true;
-
-		cat_state = CAT_RSPS;
 		break;
 	}
 }
@@ -92,8 +96,8 @@ void catface_can_helper(void *pvParameters)
 	twai_message_t rx_msg;
 
 	for (;;) {
-		ESP_LOGI(CAT_TAG, "Got message from the CAN distributer");
 		if (xQueueReceive(cat_can_queue, &rx_msg, portMAX_DELAY)) {
+			// ESP_LOGI(CAT_TAG, "Got message: arbid = 0x%x", rx_msg.identifier);
 			// This is basically impossible unless the payload was borked with
 			if (rx_msg.data_length_code == 0xff) {
 				continue;
@@ -106,11 +110,13 @@ void catface_can_helper(void *pvParameters)
 
 				// We got a message from a RECVR target
 				case BATTL_ARBID_SENDR:
+					ESP_LOGI(CAT_TAG, "am sender");
 					logic_as_sender(rx_msg);
 					break;
 
 				// We got a message from a SENDR target
 				case BATTL_ARBID_RECVR:
+					ESP_LOGI(CAT_TAG, "am receiver");
 					logic_as_receiver(rx_msg);
 					break;
 
@@ -123,29 +129,43 @@ void catface_can_helper(void *pvParameters)
 
 void state_handler()
 {
+	static uint32_t l_state;
 	uint32_t t_arb = BATTL_ARBID_RECVR;
 
-	switch(cat_state) {
+	// ESP_LOGI(CAT_TAG, "amSender: %d", amSender);
 
+	switch(cat_state) {
 	// When idle, send ping with id after every blink until ping response with id
 	case CAT_IDLE:
-		if (amSender) send_ping(t_arb, BATTL_PSND, my_id);
+		if (amSender){
+			ESP_LOGI(CAT_TAG, "Sending ping as sender");
+			send_ping(t_arb, BATTL_PSND, my_id);
+		}
 		// return a expression
 		break;
 
 	case CAT_CHAL:
-		if (amSender) send_challenge(t_arb, target_id, BATTL_CSND);
+		// Only send once
+		if (amSender && (l_state != cat_state)) {
+			ESP_LOGI(CAT_TAG, "Sending challenge as sender");
+			send_challenge(t_arb, target_id, BATTL_CSND);
+		}
 		// return a expression
 		break;
 
 	case CAT_RSPS:
-		if (amSender) {
+		// Only send once
+		if (amSender && (l_state != cat_state)) {
+			ESP_LOGI(CAT_TAG, "Sending rps as sender");
 			my_rps = get_rps();
 			send_rps(t_arb, target_id, BATTL_RSND, my_rps);
 		}
 		// return a expression
 		break;
+
 	}
+	// Remember the last state
+	l_state = cat_state;
 }
 
 void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect)
@@ -173,33 +193,21 @@ void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect)
 
 // main task responsible for set up and keeping face active
 
-void catface_helper(TFT_t * dev)
+void cat_idle_state(TFT_t * dev)
 {
 	uint8_t ascii[4];
 
-	// from cat_battle_msg, random id at startup
-	my_id = esp_random() % (sizeof(uint8_t) + 1);
+	static uint32_t idle_expression = EYES_CLOSED;
 
-	lcdFillScreen(dev, WHITE);
-
-	ESP_LOGI(CAT_TAG, "Spinning up speedometer can helper task");
-	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, NULL);
-
-	for(;;) {
-		// Todo: make this a function call to different sets of animations depending on the state
-
-		if (cat_expression == EYES_CLOSED) {
-
-			state_handler();
-
+	if (idle_expression == EYES_CLOSED) {
 			// blink is always the last defined enum so the states will always be size of possbile states - 1
-			cat_expression = esp_random() % EYES_CLOSED;
+			idle_expression = esp_random() % EYES_CLOSED;
 			// This is where a cat face state helper could be queried
-			// cat_expression = get_global_cat_state();
+			// idle_expression = get_global_cat_state();
 		}
-		else cat_expression = EYES_CLOSED;
+		else idle_expression = EYES_CLOSED;
 
-		switch(cat_expression)
+		switch(idle_expression)
 		{
 		case EYES_OPEN_FOWARD:
 			// 1,000,000 is about 1.0s
@@ -238,5 +246,95 @@ void catface_helper(TFT_t * dev)
 		change_expression(dev, ascii, NO_EFFECT);
 
 		vTaskDelay(state_tick / portTICK_PERIOD_MS);
+}
+
+char* rps_chars[] = {"Rock",
+					 "Paper",
+					 "Scisors",
+					 "Shoot!",
+					} ;
+static uint32_t rps_i = 0;
+
+void cat_rps_state(TFT_t * dev)
+{
+	uint32_t xpos = 0;
+
+	// what happens if this is !=? read information out to the screen? hmmmmm
+	if (rps_i < 4) {
+		uint8_t t_str[12];
+		strcpy((char *)t_str, rps_chars[rps_i]);
+
+		xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+		lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+		lcdWriteBuffer(dev);
+		lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+		
+		rps_i += 1;
+	}
+
+	state_tick = 500;
+	vTaskDelay(state_tick / portTICK_PERIOD_MS);
+
+	// wait to send message untill animation done
+	if (!amSender && rps_i == 4) {
+		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
+		cat_state = CAT_RPSR;
+	}
+}
+
+void cat_rpsr_state(TFT_t * dev)
+{
+	uint32_t xpos = 0;
+	uint8_t t_str[12];
+
+	if (didWinRPS(my_rps, their_rps)) {
+		strcpy((char *)t_str, "i win!");
+		amSender = true;
+	}
+	else {
+		strcpy((char *)t_str, "boo hoo!");
+		amSender = false;
+	}
+
+	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+	lcdWriteBuffer(dev);
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+	
+	state_tick = 4000;
+	vTaskDelay(state_tick / portTICK_PERIOD_MS);
+
+	cat_state = CAT_BATL;
+}
+
+void catface_helper(TFT_t * dev)
+{
+	// from cat_battle_msg, random id at startup
+	my_id = esp_random() % (256);
+	ESP_LOGI(CAT_TAG, "My id is 0x%x", my_id);
+
+	lcdFillScreen(dev, WHITE);
+
+	ESP_LOGI(CAT_TAG, "Spinning up speedometer can helper task");
+	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, NULL);
+
+	for(;;) {
+		// Todo: make this a function call to different sets of animations depending on the state
+		state_handler();
+
+		switch(cat_state) {
+		// case CAT_CHAL:
+		// 	effect = EFFECT_BLUSH;
+		case CAT_IDLE:
+			cat_idle_state(dev);
+			break;
+		case CAT_RSPS:
+			effect = NO_EFFECT;
+			cat_rps_state(dev);
+			break;
+		case CAT_RPSR:
+			cat_rpsr_state(dev);
+			break;
+		}
 	}
 }

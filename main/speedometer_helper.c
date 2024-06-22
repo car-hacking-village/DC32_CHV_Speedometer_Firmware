@@ -53,8 +53,8 @@ void speedometer_can_helper(void *pvParameters)
 	twai_message_t rx_msg;
 
 	for (;;) {
-		ESP_LOGI(SPD_TAG, "Got message from the CAN distributer");
 		if (xQueueReceive(spd_can_queue, &rx_msg, portMAX_DELAY)) {
+			// ESP_LOGI(SPD_TAG, "Got message: arbid = 0x%x", rx_msg.identifier);
 			// This is basically impossible unless the payload was borked with
 			if (rx_msg.data_length_code == 0xff) {
 				continue;

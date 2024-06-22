@@ -3,23 +3,23 @@
 
 static uint8_t c_rps = RPS_NONE;
 
-void send_ping(uint32_t arbid, uint8_t ping_type, uint8_t my_id)
+void send_ping(uint32_t arbid, uint8_t comm_type, uint8_t my_id)
 {
 	uint8_t tdata[8];
 
-	tdata[0] = ping_type;
+	tdata[0] = comm_type;
 	tdata[1] = my_id;
 
 	can_send(arbid, 0x1, 0x8, (uint8_t*)&tdata);
 }
 
-void send_challenge(uint32_t arbid, uint8_t target_id, uint8_t chal_type)
+void send_challenge(uint32_t arbid, uint8_t target_id, uint8_t comm_type)
 {
 	// Place holder for now
 	uint8_t tdata[8];
 
-	tdata[0] = target_id;
-	tdata[1] = chal_type;
+	tdata[0] = comm_type;
+	tdata[1] = target_id;
 
 	can_send(arbid, 0x1, 0x8, (uint8_t*)&tdata);
 }
@@ -31,12 +31,12 @@ uint8_t get_rps()
 	return c_rps;
 }
 
-void send_rps(uint32_t arbid, uint8_t target_id, uint8_t rps_type, uint8_t value)
+void send_rps(uint32_t arbid, uint8_t target_id, uint8_t comm_type, uint8_t value)
 {
 	uint8_t tdata[8];
 
-	tdata[0] = target_id;
-	tdata[1] = rps_type;
+	tdata[0] = comm_type;
+	tdata[1] = target_id;
 	tdata[2] = value;
 
 	can_send(arbid, 0x1, 0x8, (uint8_t*)&tdata);

@@ -61,7 +61,7 @@ static uint32_t current_task = 0;
 
 static QueueHandle_t gpio_evt_queue = NULL;
 
-static TaskHandle_t catface_t = NULL;
+// static TaskHandle_t catface_t = NULL;
 static TaskHandle_t dickbutt_t = NULL;
 static TaskHandle_t speedometer_t = NULL;
 
@@ -84,18 +84,23 @@ TFT_t * copyDisplayInstance(void)
 void can_share_task(void *pvParameters)
 {
 	twai_message_t rx_msg;
+	
+	spd_can_queue = xQueueCreate(1, sizeof(twai_message_t));
+	cat_can_queue = xQueueCreate(1, sizeof(twai_message_t));
+	
 	QueueHandle_t task_quwu[] = {spd_can_queue, cat_can_queue, NULL};
 
 	twai_init();
 
-	spd_can_queue = xQueueCreate(5, sizeof(twai_message_t));
-	cat_can_queue = xQueueCreate(5, sizeof(twai_message_t));
+	ESP_ERROR_CHECK(twai_start());
+    ESP_LOGI(MAIN_TAG, "TWAI driver started");
 
 	for(;;) {
 		can_recv(&rx_msg);
-		ESP_LOGI(MAIN_TAG, "CAN Message Received");
+    	// ESP_LOGI(MAIN_TAG, "%d %s", current_task, (task_quwu[current_task] != NULL)?"true":"false");
 		if (task_quwu[current_task] != NULL) {
-			xQueueSend(task_quwu[current_task], &rx_msg, 150);
+    		// ESP_LOGI(MAIN_TAG, "Giving msg to %d", current_task);
+			xQueueSend(task_quwu[current_task], &rx_msg, portMAX_DELAY);
 		}
   	}
 }
@@ -123,7 +128,7 @@ static void task_switch(void *pvParameters)
 
 	    	// Send a NULL CAN message to kick the task helper off and wait to send a message
 	    	// May need to time out on this
-	    	xQueueSend(can_rx_queue, &dummy_can, 150);
+	    	xQueueSend(can_rx_queue, &dummy_can, portMAX_DELAY);
 
 	    	current_task = (current_task + 1) % NUM_MAIN_TASKS;
 	        ESP_LOGI(MAIN_TAG, "Switching task to %d", current_task);
@@ -224,7 +229,8 @@ void app_main(void)
 	xTaskCreate(speedometer, "speedometer", 1024*6, NULL, SPD_TASK_PRIO, &speedometer_t);
 
 	ESP_LOGI(MAIN_TAG, "Spinning up can_share_task task");
-    xTaskCreate(can_share_task, "can_share_task", 2048, NULL, CSH_TASK_PRIO, NULL);
+    // xTaskCreate(can_share_task, "can_share_task", 2048, NULL, CSH_TASK_PRIO, NULL);
+    xTaskCreate(can_share_task, "can_share_task", 2048, NULL, CTRL_TSK_PRIO, NULL);
 
 	// This task will run if the other tasks are sleeping
 	// Need to be a lower priority to ensure it doesn't prempt the others

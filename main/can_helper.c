@@ -23,8 +23,10 @@ static void twai_receive_task(void *arg)
 	while (true) {
     	if (twai_receive(&rx_msg, portMAX_DELAY) != ESP_ERR_TIMEOUT)
     	{
-			// print("[+] RECV: {}".format(binascii.hexlify(bytes(data))))
-			// print("[+] RECV: {}".format(data))
+			// print("[+] RECV: {}".format(binascii.hexlify(bytes(data))));
+			// print("[+] RECV: {}".format(data));
+			// ESP_LOGI(TWAI_TAG, "RECV msg");
+
 			xQueueSend(can_rx_queue, &rx_msg, portMAX_DELAY);
     	}
     }
@@ -36,6 +38,7 @@ static void twai_transmit_task(void *arg)
     	twai_message_t tx_msg;
         if (xQueueReceive(can_tx_queue, &tx_msg, portMAX_DELAY) == pdTRUE)
         {
+			ESP_LOGI(TWAI_TAG, "SEND msg");
         	twai_transmit(&tx_msg, portMAX_DELAY);
         }
     }
@@ -51,6 +54,8 @@ void twai_init(void)
 	xTaskCreatePinnedToCore(twai_transmit_task, "TWAI_tx", 4096, NULL, TX_TASK_PRIO, NULL, tskNO_AFFINITY);
 	// Messy, but syncronization is needed in the main task, it doesn't need to be that pretty
 	// xTaskCreatePinnedToCore(twai_control_task, "TWAI_ctrl", 4096, NULL, CTRL_TSK_PRIO, NULL, tskNO_AFFINITY);
+
+	ESP_LOGI(TWAI_TAG, "Spinning up CAN");
 
 	ESP_ERROR_CHECK(twai_driver_install(&g_config, &t_config, &f_config));
 }

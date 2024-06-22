@@ -1,4 +1,7 @@
 
+#ifndef CATFACEHELPER_H_
+#define CATFACEHELPER_H_
+
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -29,6 +32,7 @@ enum cat_expressions {
 
 enum cat_effects {
 	NO_EFFECT = 0,
+	EFFECT_BLUSH,
 };
 
 enum cat_32_32_syms {
@@ -40,7 +44,10 @@ enum cat_32_32_syms {
 	SYM_32_ORHT = 0x5,
 };
 
+extern TaskHandle_t catface_t;
 extern QueueHandle_t cat_can_queue;
 
 void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect);
 void catface_helper(TFT_t * dev);
+
+#endif /* CATFACEHELPER_H_ */
