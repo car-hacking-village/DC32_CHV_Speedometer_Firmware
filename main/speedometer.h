@@ -43,8 +43,6 @@ enum cat_states {
 	CAT_RSPS,	// The badge who was responded to sends a random rock paper scissor and recieves a random rock paper scissor
 				// 		if the sender loses the responder becomes the sender
 	CAT_RPSR,	// Sync for showing result
-	CAT_BATL,	// The sender sends a random attack value, then the responder, attacks must be >=1, if attack is zero
-				// 		that means that side died
 	CAT_VICT,	// Glory to cat, returns to idle after X amount of time
 	CAT_DEDD,	// Sad cat day, at least cute cat ghost, stays this way until reboot, sends flag message every second 
 				// (placeholder or real)

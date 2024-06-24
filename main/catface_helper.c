@@ -7,6 +7,8 @@ static uint32_t cat_state = CAT_IDLE;
 static uint32_t cat_expression = EYES_CLOSED;
 
 TaskHandle_t catface_t = NULL;
+static TaskHandle_t catface_can_t;
+
 QueueHandle_t cat_can_queue = NULL;
 
 uint32_t speed = 0;
@@ -17,6 +19,15 @@ static uint8_t my_id;
 static uint8_t target_id 	= 0;
 static uint8_t my_rps 		= RPS_NONE;
 static uint8_t their_rps 	= RPS_NONE;
+
+char* rps_chars[] = {"Rock",
+					 "Paper",
+					 "Scisors",
+					 "Shoot!",
+					} ;
+static uint32_t rps_i = 0;
+#define	RPS_RNDS = 3;
+static uint8_t rps_rnd = 0;
 
 void logic_as_sender(twai_message_t rx_msg)
 {
@@ -31,16 +42,13 @@ void logic_as_sender(twai_message_t rx_msg)
 
 	case BATTL_CRSP:
 		// Goto rock paper scissors
+		rps_rnd = 0;
 		cat_state = CAT_RSPS;
 		break;
 
 	case BATTL_RRSP:
 		// Determine from response if we are sending still
 		their_rps = rx_msg.data[2];
-		// if (!didWinRPS(my_rps, their_rps))
-		// 	amSender = false;
-
-		cat_state = CAT_RPSR;
 		break;
 
 	default:
@@ -70,9 +78,11 @@ void logic_as_receiver(twai_message_t rx_msg)
 		// TODO: send key to modify traffic
 		send_challenge(t_arb, target_id, BATTL_CRSP);
 		// Goto rock paper scissors
+		rps_rnd = 0;
 		cat_state = CAT_RSPS;
 		// TODO: kick the display task, may need to make another thread for it
-		
+		vTaskResume(catface_t);
+
 		break;
 
 	// Todo: to garuntee winning RPS you can cheat if you are the receiver
@@ -86,6 +96,8 @@ void logic_as_receiver(twai_message_t rx_msg)
 		their_rps = rx_msg.data[2];
 		while (my_rps == their_rps)
 			my_rps = get_rps();
+
+		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
 
 		break;
 	}
@@ -127,9 +139,10 @@ void catface_can_helper(void *pvParameters)
 	}
 }
 
+static uint32_t l_state;
+
 void state_handler()
 {
-	static uint32_t l_state;
 	uint32_t t_arb = BATTL_ARBID_RECVR;
 
 	// ESP_LOGI(CAT_TAG, "amSender: %d", amSender);
@@ -248,13 +261,6 @@ void cat_idle_state(TFT_t * dev)
 		vTaskDelay(state_tick / portTICK_PERIOD_MS);
 }
 
-char* rps_chars[] = {"Rock",
-					 "Paper",
-					 "Scisors",
-					 "Shoot!",
-					} ;
-static uint32_t rps_i = 0;
-
 void cat_rps_state(TFT_t * dev)
 {
 	uint32_t xpos = 0;
@@ -275,12 +281,25 @@ void cat_rps_state(TFT_t * dev)
 	state_tick = 500;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
 
-	// wait to send message untill animation done
-	if (!amSender && rps_i == 4) {
-		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
+	// wait to send message until animation done
+	if (rps_i == 4) {
+		rps_i = 0;
+		
+		// If values are not valid, try again
+		if (my_rps == RPS_NONE || their_rps == RPS_NONE){
+			// Send a restart?
+			if (amSender) {
+				// send message again if sender
+				l_state = CAT_SYNC;
+			}
+			return;
+		}
 		cat_state = CAT_RPSR;
 	}
 }
+
+static bool firstLose 	= false;
+static bool firstWin 	= false;
 
 void cat_rpsr_state(TFT_t * dev)
 {
@@ -288,12 +307,25 @@ void cat_rpsr_state(TFT_t * dev)
 	uint8_t t_str[12];
 
 	if (didWinRPS(my_rps, their_rps)) {
-		strcpy((char *)t_str, "i win!");
-		amSender = true;
+		if (firstWin == true && rps_rnd >= 1) {
+			strcpy((char *)t_str, "i win!");
+			cat_state = CAT_IDLE;
+		}
+		else {
+			strcpy((char *)t_str, rps_str[my_rps]);
+		}
+		firstWin = true;
 	}
 	else {
-		strcpy((char *)t_str, "boo hoo!");
-		amSender = false;
+		if (firstLose == true && rps_rnd >= 1) {
+			strcpy((char *)t_str, "boo hoo!");
+			cat_state = CAT_DEDD;
+			vTaskSuspend(catface_can_t);
+		}
+		else {
+			strcpy((char *)t_str, rps_str[my_rps]);
+		}
+		firstLose = true;
 	}
 
 	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
@@ -304,7 +336,13 @@ void cat_rpsr_state(TFT_t * dev)
 	state_tick = 4000;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
 
-	cat_state = CAT_BATL;
+	// One more round
+	if (cat_state == CAT_RPSR){
+		l_state = CAT_RPSR;
+		cat_state = CAT_RSPS;
+	}
+
+	rps_rnd++;
 }
 
 void catface_helper(TFT_t * dev)
@@ -316,7 +354,7 @@ void catface_helper(TFT_t * dev)
 	lcdFillScreen(dev, WHITE);
 
 	ESP_LOGI(CAT_TAG, "Spinning up speedometer can helper task");
-	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, NULL);
+	xTaskCreate(catface_can_helper, "catface_can_helper", 1024*6, NULL, CAT_CAN_HLP_PRIO, &catface_can_t);
 
 	for(;;) {
 		// Todo: make this a function call to different sets of animations depending on the state
@@ -326,6 +364,8 @@ void catface_helper(TFT_t * dev)
 		// case CAT_CHAL:
 		// 	effect = EFFECT_BLUSH;
 		case CAT_IDLE:
+			firstLose = false;
+			firstWin = false;
 			cat_idle_state(dev);
 			break;
 		case CAT_RSPS:

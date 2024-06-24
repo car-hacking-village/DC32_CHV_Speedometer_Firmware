@@ -27,7 +27,11 @@ void send_challenge(uint32_t arbid, uint8_t target_id, uint8_t comm_type)
 // get the local instance of rps
 uint8_t get_rps()
 {
-	c_rps = esp_random() % RPS_NONE;
+	// Over kill
+	do {
+		c_rps = esp_random() % RPS_NONE;
+	} while (c_rps >= RPS_NONE);
+
 	return c_rps;
 }
 
@@ -52,6 +56,8 @@ bool didWinRPS(uint8_t my_rps, uint8_t tar_rps)
 	2 - 0 =  0 L
 	2 - 1 =  1 W
 	*/
+
 	int8_t tmp = (int8_t)my_rps - (int8_t)tar_rps;
+	ESP_LOGI(CMG_TAG, "%d - %d = %d", my_rps, tar_rps, tmp);
 	return ((tmp == 1) || (tmp == -2));
 }
