@@ -275,7 +275,7 @@ void cat_rps_state(TFT_t * dev)
 		lcdWriteBuffer(dev);
 		lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
 		
-		rps_i += 1;
+		rps_i++;
 	}
 
 	state_tick = 500;
@@ -301,37 +301,45 @@ void cat_rps_state(TFT_t * dev)
 static bool firstLose 	= false;
 static bool firstWin 	= false;
 
+char * rps_str[] = {
+	"Rock!",
+	"Paper!",
+	"Sicsors!",
+};
+
 void cat_rpsr_state(TFT_t * dev)
 {
 	uint32_t xpos = 0;
 	uint8_t t_str[12];
 
+	// make global and modify as it goes, reseting the winner
+	uint8_t ascii[4] = "ooo";
+
 	if (didWinRPS(my_rps, their_rps)) {
 		if (firstWin == true && rps_rnd >= 1) {
-			strcpy((char *)t_str, "i win!");
-			cat_state = CAT_IDLE;
+			cat_state = CAT_VICT;
 		}
-		else {
-			strcpy((char *)t_str, rps_str[my_rps]);
-		}
+		strcpy((char *)t_str, rps_str[my_rps]);
 		firstWin = true;
 	}
 	else {
 		if (firstLose == true && rps_rnd >= 1) {
-			strcpy((char *)t_str, "boo hoo!");
 			cat_state = CAT_DEDD;
-			vTaskSuspend(catface_can_t);
 		}
-		else {
-			strcpy((char *)t_str, rps_str[my_rps]);
-		}
+		strcpy((char *)t_str, rps_str[my_rps]);
 		firstLose = true;
 	}
 
 	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+
 	lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, ascii, BLACK);
+
 	lcdWriteBuffer(dev);
+	
 	lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, ascii, WHITE);
+
 	
 	state_tick = 4000;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
@@ -343,6 +351,44 @@ void cat_rpsr_state(TFT_t * dev)
 	}
 
 	rps_rnd++;
+}
+
+void cat_vict_state(TFT_t * dev)
+{
+	uint32_t xpos = 0;
+	uint8_t t_str[12];
+
+	strcpy((char *)t_str, "Cat-tastic!");
+
+	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+	lcdWriteBuffer(dev);
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+	
+	state_tick = 4000;
+	vTaskDelay(state_tick / portTICK_PERIOD_MS);
+
+	cat_state = CAT_IDLE;
+}
+
+// We can make ghosty here
+void cat_dedd_state(TFT_t * dev)
+{
+	uint32_t xpos = 0;
+	uint8_t t_str[12];
+
+	strcpy((char *)t_str, "boo hoo!");
+
+	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+	lcdWriteBuffer(dev);
+	lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+	
+	state_tick = 4000;
+	vTaskDelay(state_tick / portTICK_PERIOD_MS);
+
+	// Stay "dedd"
+	vTaskSuspend(catface_can_t);
 }
 
 void catface_helper(TFT_t * dev)
@@ -374,6 +420,12 @@ void catface_helper(TFT_t * dev)
 			break;
 		case CAT_RPSR:
 			cat_rpsr_state(dev);
+			break;
+		case CAT_VICT:
+			cat_vict_state(dev);
+			break;
+		case CAT_DEDD:
+			cat_dedd_state(dev);
 			break;
 		}
 	}
