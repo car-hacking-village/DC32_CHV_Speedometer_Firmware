@@ -6,6 +6,8 @@ static uint32_t state_tick = 0;
 static uint32_t cat_state = CAT_IDLE;
 static uint32_t cat_expression = EYES_CLOSED;
 
+
+
 TaskHandle_t catface_t = NULL;
 static TaskHandle_t catface_can_t;
 
@@ -17,14 +19,22 @@ static uint8_t effect = 0;
 static bool amSender 		= true;
 static uint8_t my_id;
 static uint8_t target_id 	= 0;
-static uint8_t my_rps 		= RPS_NONE;
-static uint8_t their_rps 	= RPS_NONE;
+static uint32_t my_rps 		= RPS_NONE;
+static uint32_t their_rps 	= RPS_NONE;
+static uint8_t score[4];
+
+char * rps_str[] = {
+	"Rock",
+	"Paper",
+	"Sicsors",
+};
 
 char* rps_chars[] = {"Rock",
 					 "Paper",
 					 "Scisors",
 					 "Shoot!",
 					} ;
+
 static uint32_t rps_i = 0;
 #define	RPS_RNDS = 3;
 static uint8_t rps_rnd = 0;
@@ -43,6 +53,10 @@ void logic_as_sender(twai_message_t rx_msg)
 	case BATTL_CRSP:
 		// Goto rock paper scissors
 		rps_rnd = 0;
+		score[0] = 'o';
+		score[1] = 'o';
+		score[2] = 'o';
+
 		cat_state = CAT_RSPS;
 		break;
 
@@ -77,8 +91,13 @@ void logic_as_receiver(twai_message_t rx_msg)
 		if (rx_msg.data[1] != my_id) return;
 		// TODO: send key to modify traffic
 		send_challenge(t_arb, target_id, BATTL_CRSP);
+
 		// Goto rock paper scissors
 		rps_rnd = 0;
+		score[0] = 'o';
+		score[1] = 'o';
+		score[2] = 'o';
+
 		cat_state = CAT_RSPS;
 		// TODO: kick the display task, may need to make another thread for it
 		vTaskResume(catface_t);
@@ -301,44 +320,59 @@ void cat_rps_state(TFT_t * dev)
 static bool firstLose 	= false;
 static bool firstWin 	= false;
 
-char * rps_str[] = {
-	"Rock!",
-	"Paper!",
-	"Sicsors!",
-};
+/*
+	We do not check the bounds of 'their_rps', so add another screen
+	showing the result of the match, "rock beats scisors", the sender
+	can send anything which can the size of the type (make it large)
+	Make the buffers for the display in bss and they can be offset to
+	from the value.
+*/
+
 
 void cat_rpsr_state(TFT_t * dev)
 {
 	uint32_t xpos = 0;
-	uint8_t t_str[12];
+	uint8_t my_str[12];
+	uint8_t w_or_l[12];
+	uint8_t their_str[12];
+
+	ESP_LOGI(CAT_TAG, "rps_str allocation %x", rps_str);
 
 	// make global and modify as it goes, reseting the winner
-	uint8_t ascii[4] = "ooo";
-
 	if (didWinRPS(my_rps, their_rps)) {
+
+		score[rps_rnd] = 0x80;
+
 		if (firstWin == true && rps_rnd >= 1) {
 			cat_state = CAT_VICT;
 		}
-		strcpy((char *)t_str, rps_str[my_rps]);
+		strcpy((char *)my_str, rps_str[my_rps]);
+		strcpy((char *)w_or_l, "beats");
+		strcpy((char *)their_str, rps_str[their_rps]);
 		firstWin = true;
 	}
 	else {
+
+		score[rps_rnd] = 0x78;
+
 		if (firstLose == true && rps_rnd >= 1) {
 			cat_state = CAT_DEDD;
 		}
-		strcpy((char *)t_str, rps_str[my_rps]);
+		strcpy((char *)my_str, rps_str[my_rps]);
+		strcpy((char *)w_or_l, "loses to");
+		strcpy((char *)their_str, rps_str[their_rps]);
 		firstLose = true;
 	}
 
-	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
+	xpos = (CONFIG_WIDTH - (strlen((char *)my_str) * 8)) / 2;
 
-	lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
-	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, ascii, BLACK);
+	lcdDrawString2(dev, font8x16, xpos, 50, my_str, BLACK);
+	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, score, BLACK);
 
 	lcdWriteBuffer(dev);
 	
-	lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
-	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, ascii, WHITE);
+	lcdDrawString2(dev, font8x16, xpos, 50, my_str, WHITE);
+	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, score, WHITE);
 
 	
 	state_tick = 4000;

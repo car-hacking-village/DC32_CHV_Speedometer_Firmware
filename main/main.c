@@ -74,6 +74,8 @@ TFT_t * copyDisplayInstance(void)
 	memcpy(t_dev, &g_dev, sizeof(TFT_t));
 
 	uint8_t * buffer = (uint8_t*)malloc(g_dev._blen);
+	// TODO: REMOVE
+	ESP_LOGI(MAIN_TAG, "buffer allocation %x", buffer);
 	t_dev->_buffer = buffer;
 
 	return t_dev;
