@@ -13,21 +13,22 @@ static TaskHandle_t catface_can_t;
 
 QueueHandle_t cat_can_queue = NULL;
 
+static char * rps_str[] = {
+	"Rock",
+	"Paper",
+	"Sicsors",
+};
+
 uint32_t speed = 0;
 static uint8_t effect = 0;
 
 static bool amSender 		= true;
 static uint8_t my_id;
 static uint8_t target_id 	= 0;
-static uint32_t my_rps 		= RPS_NONE;
-static uint32_t their_rps 	= RPS_NONE;
+static int8_t my_rps 		= RPS_NONE;
+static int8_t their_rps 	= RPS_NONE;
 static uint8_t score[4];
 
-char * rps_str[] = {
-	"Rock",
-	"Paper",
-	"Sicsors",
-};
 
 char* rps_chars[] = {"Rock",
 					 "Paper",
@@ -38,6 +39,8 @@ char* rps_chars[] = {"Rock",
 static uint32_t rps_i = 0;
 #define	RPS_RNDS = 3;
 static uint8_t rps_rnd = 0;
+
+char * flag2 = "flag{not_the_real_flag_two_if_re}";
 
 void logic_as_sender(twai_message_t rx_msg)
 {
@@ -61,7 +64,6 @@ void logic_as_sender(twai_message_t rx_msg)
 		break;
 
 	case BATTL_RRSP:
-		// Determine from response if we are sending still
 		their_rps = rx_msg.data[2];
 		break;
 
@@ -88,7 +90,11 @@ void logic_as_receiver(twai_message_t rx_msg)
 		break;
 
 	case BATTL_CSND:
-		if (rx_msg.data[1] != my_id) return;
+		if (rx_msg.data[1] != my_id) {
+			ESP_LOGI(CAT_TAG, "BATTL_CSND: ID did not match");
+			return;
+		}
+
 		// TODO: send key to modify traffic
 		send_challenge(t_arb, target_id, BATTL_CRSP);
 
@@ -106,7 +112,10 @@ void logic_as_receiver(twai_message_t rx_msg)
 
 	// Todo: to garuntee winning RPS you can cheat if you are the receiver
 	case BATTL_RSND:
-		if (rx_msg.data[1] != my_id) return;
+		if (rx_msg.data[1] != my_id) {
+			ESP_LOGI(CAT_TAG, "BATTL_RSND: ID did not match");
+			return;
+		}
 
 		my_rps = get_rps();
 
@@ -141,13 +150,13 @@ void catface_can_helper(void *pvParameters)
 
 				// We got a message from a RECVR target
 				case BATTL_ARBID_SENDR:
-					ESP_LOGI(CAT_TAG, "am sender");
+					// ESP_LOGI(CAT_TAG, "am sender");
 					logic_as_sender(rx_msg);
 					break;
 
 				// We got a message from a SENDR target
 				case BATTL_ARBID_RECVR:
-					ESP_LOGI(CAT_TAG, "am receiver");
+					// ESP_LOGI(CAT_TAG, "am receiver");
 					logic_as_receiver(rx_msg);
 					break;
 
@@ -170,7 +179,7 @@ void state_handler()
 	// When idle, send ping with id after every blink until ping response with id
 	case CAT_IDLE:
 		if (amSender){
-			ESP_LOGI(CAT_TAG, "Sending ping as sender");
+			// ESP_LOGI(CAT_TAG, "Sending ping as sender");
 			send_ping(t_arb, BATTL_PSND, my_id);
 		}
 		// return a expression
@@ -280,19 +289,31 @@ void cat_idle_state(TFT_t * dev)
 		vTaskDelay(state_tick / portTICK_PERIOD_MS);
 }
 
-void cat_rps_state(TFT_t * dev)
+void lcdDrawCentered(TFT_t * dev, uint8_t * font, uint16_t x_offset, uint16_t y, uint8_t * ascii, uint8_t color)
 {
 	uint32_t xpos = 0;
+
+	xpos = ((CONFIG_WIDTH - (strlen((char *)ascii) * 8)) / 2) + x_offset;
+	lcdDrawString2(dev, font, xpos, y, 	ascii, color);
+}
+
+void cat_rps_state(TFT_t * dev)
+{
+
+	// this breaks stuff but seems to be able to effect sync
+	if (my_rps == RPS_NONE || their_rps == RPS_NONE){
+		l_state = CAT_SYNC;
+		return;
+	}
 
 	// what happens if this is !=? read information out to the screen? hmmmmm
 	if (rps_i < 4) {
 		uint8_t t_str[12];
 		strcpy((char *)t_str, rps_chars[rps_i]);
 
-		xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
-		lcdDrawString2(dev, font8x16, xpos, 50, t_str, BLACK);
+		lcdDrawCentered(dev, font8x16, 0, 50, t_str, BLACK);
 		lcdWriteBuffer(dev);
-		lcdDrawString2(dev, font8x16, xpos, 50, t_str, WHITE);
+		lcdDrawCentered(dev, font8x16, 0, 50, t_str, WHITE);
 		
 		rps_i++;
 	}
@@ -304,21 +325,24 @@ void cat_rps_state(TFT_t * dev)
 	if (rps_i == 4) {
 		rps_i = 0;
 		
-		// If values are not valid, try again
-		if (my_rps == RPS_NONE || their_rps == RPS_NONE){
-			// Send a restart?
-			if (amSender) {
-				// send message again if sender
-				l_state = CAT_SYNC;
-			}
-			return;
-		}
+		// // If values are not valid, try again
+		// if (my_rps == RPS_NONE || their_rps == RPS_NONE){
+		// 	ESP_LOGI(CAT_TAG, "my_rps %x, my_rps %x", my_rps, their_rps);
+		// 	// Send a restart?
+		// 	if (amSender) {
+		// 		// send message again if sender
+		// 		l_state = CAT_SYNC;
+		// 	}
+		// 	return;
+		// }
 		cat_state = CAT_RPSR;
 	}
 }
 
 static bool firstLose 	= false;
 static bool firstWin 	= false;
+
+
 
 /*
 	We do not check the bounds of 'their_rps', so add another screen
@@ -341,6 +365,7 @@ void cat_rpsr_state(TFT_t * dev)
 	// make global and modify as it goes, reseting the winner
 	if (didWinRPS(my_rps, their_rps)) {
 
+		// 'o' but filled
 		score[rps_rnd] = 0x80;
 
 		if (firstWin == true && rps_rnd >= 1) {
@@ -352,7 +377,7 @@ void cat_rpsr_state(TFT_t * dev)
 		firstWin = true;
 	}
 	else {
-
+		// 'x'
 		score[rps_rnd] = 0x78;
 
 		if (firstLose == true && rps_rnd >= 1) {
@@ -364,16 +389,18 @@ void cat_rpsr_state(TFT_t * dev)
 		firstLose = true;
 	}
 
-	xpos = (CONFIG_WIDTH - (strlen((char *)my_str) * 8)) / 2;
 
-	lcdDrawString2(dev, font8x16, xpos, 50, my_str, BLACK);
+	lcdDrawCentered(dev, font8x16, 0, 40-18, my_str, BLACK);
+	lcdDrawCentered(dev, font8x16, 0, 40, 	 w_or_l, BLACK);
+	lcdDrawCentered(dev, font8x16, 0, 40+18, their_str, BLACK);
 	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, score, BLACK);
 
 	lcdWriteBuffer(dev);
 	
-	lcdDrawString2(dev, font8x16, xpos, 50, my_str, WHITE);
+	lcdDrawCentered(dev, font8x16, 0, 40-18, my_str, WHITE);
+	lcdDrawCentered(dev, font8x16, 0, 40, 	 w_or_l, WHITE);
+	lcdDrawCentered(dev, font8x16, 0, 40+18, their_str, WHITE);	
 	lcdDrawString2(dev, font8x8, CONFIG_WIDTH-(8*3)-8, CONFIG_HEIGHT-4, score, WHITE);
-
 	
 	state_tick = 4000;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
@@ -411,6 +438,9 @@ void cat_dedd_state(TFT_t * dev)
 	uint32_t xpos = 0;
 	uint8_t t_str[12];
 
+	// Stay "dedd"
+	vTaskSuspend(catface_can_t);
+
 	strcpy((char *)t_str, "boo hoo!");
 
 	xpos = (CONFIG_WIDTH - (strlen((char *)t_str) * 8)) / 2;
@@ -421,8 +451,8 @@ void cat_dedd_state(TFT_t * dev)
 	state_tick = 4000;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
 
-	// Stay "dedd"
-	vTaskSuspend(catface_can_t);
+	// This is useless, just to make sure the flag is not compiled out
+	ESP_LOGI(CAT_TAG, "%s", flag2);
 }
 
 void catface_helper(TFT_t * dev)

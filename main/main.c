@@ -162,7 +162,6 @@ void dickbutt_task(void *pvParameters)
 	for(;;) {
 		for (uint32_t i = 0; i < 25; i++) {
 			// No need for clearing the screen as the animation will over write the entire screen
-			// barrier(dickbutt_sem);
 
 			strcpy(file, dickbutt[i]);
 			BMPTest(l_dev, file, CONFIG_WIDTH, CONFIG_HEIGHT, true);

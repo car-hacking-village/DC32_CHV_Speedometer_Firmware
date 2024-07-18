@@ -34,7 +34,7 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 {
 	esp_err_t ret;
 
-	ESP_LOGI(TAG, "GPIO_CS=%d",GPIO_CS);
+	// ESP_LOGI(TAG, "GPIO_CS=%d",GPIO_CS);
 	if ( GPIO_CS >= 0 ) {
 		//gpio_pad_select_gpio( GPIO_CS );
 		gpio_reset_pin( GPIO_CS );
@@ -42,13 +42,13 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 		gpio_set_level( GPIO_CS, 0 );
 	}
 
-	ESP_LOGI(TAG, "GPIO_DC=%d",GPIO_DC);
+	// ESP_LOGI(TAG, "GPIO_DC=%d",GPIO_DC);
 	//gpio_pad_select_gpio( GPIO_DC );
 	gpio_reset_pin( GPIO_DC );
 	gpio_set_direction( GPIO_DC, GPIO_MODE_OUTPUT );
 	gpio_set_level( GPIO_DC, 0 );
 
-	ESP_LOGI(TAG, "GPIO_RESET=%d",GPIO_RESET);
+	// ESP_LOGI(TAG, "GPIO_RESET=%d",GPIO_RESET);
 	if ( GPIO_RESET >= 0 ) {
 		//gpio_pad_select_gpio( GPIO_RESET );
 		gpio_reset_pin( GPIO_RESET );
@@ -61,15 +61,15 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 		delayMS(50);
 	}
 
-	ESP_LOGI(TAG, "GPIO_BL=%d",GPIO_BL);
+	// ESP_LOGI(TAG, "GPIO_BL=%d",GPIO_BL);
 	if ( GPIO_BL >= 0 ) {
 		gpio_reset_pin( GPIO_BL );
 		gpio_set_direction( GPIO_BL, GPIO_MODE_OUTPUT );
 		gpio_set_level( GPIO_BL, 0 );
 	}
 
-	ESP_LOGI(TAG, "GPIO_MOSI=%d",GPIO_MOSI);
-	ESP_LOGI(TAG, "GPIO_SCLK=%d",GPIO_SCLK);
+	// ESP_LOGI(TAG, "GPIO_MOSI=%d",GPIO_MOSI);
+	// ESP_LOGI(TAG, "GPIO_SCLK=%d",GPIO_SCLK);
 	spi_bus_config_t buscfg = {
 		.sclk_io_num = GPIO_SCLK,
 		.mosi_io_num = GPIO_MOSI,
@@ -80,7 +80,7 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 
 	//ret = spi_bus_initialize( HSPI_HOST, &buscfg, 1 );
 	ret = spi_bus_initialize( LCD_HOST, &buscfg, SPI_DMA_CH_AUTO );
-	ESP_LOGD(TAG, "spi_bus_initialize=%d",ret);
+	// ESP_LOGD(TAG, "spi_bus_initialize=%d",ret);
 	assert(ret==ESP_OK);
 
 	spi_device_interface_config_t devcfg={
@@ -98,7 +98,7 @@ void spi_master_init(TFT_t * dev, int16_t GPIO_MOSI, int16_t GPIO_SCLK, int16_t 
 	
 	spi_device_handle_t handle;
 	ret = spi_bus_add_device( LCD_HOST, &devcfg, &handle);
-	ESP_LOGD(TAG, "spi_bus_add_device=%d",ret);
+	// ESP_LOGD(TAG, "spi_bus_add_device=%d",ret);
 	assert(ret==ESP_OK);
 	dev->_dc = GPIO_DC;
 	dev->_bl = GPIO_BL;
