@@ -25,8 +25,8 @@ static uint8_t effect = 0;
 static bool amSender 		= true;
 static uint8_t my_id;
 static uint8_t target_id 	= 0;
-static int8_t my_rps 		= RPS_NONE;
-static int8_t their_rps 	= RPS_NONE;
+static int16_t my_rps 		= RPS_NONE;
+static int16_t their_rps 	= RPS_NONE;
 static uint8_t score[4];
 
 
@@ -64,7 +64,7 @@ void logic_as_sender(twai_message_t rx_msg)
 		break;
 
 	case BATTL_RRSP:
-		their_rps = rx_msg.data[2];
+		their_rps = rx_msg.data[2] << 4 | rx_msg.data[3];
 		break;
 
 	default:
@@ -89,6 +89,7 @@ void logic_as_receiver(twai_message_t rx_msg)
 		cat_state = CAT_CHAL;
 		break;
 
+	// TODO: use our IDs to obfuscate the traffic
 	case BATTL_CSND:
 		if (rx_msg.data[1] != my_id) {
 			ESP_LOGI(CAT_TAG, "BATTL_CSND: ID did not match");
@@ -110,7 +111,6 @@ void logic_as_receiver(twai_message_t rx_msg)
 
 		break;
 
-	// Todo: to garuntee winning RPS you can cheat if you are the receiver
 	case BATTL_RSND:
 		if (rx_msg.data[1] != my_id) {
 			ESP_LOGI(CAT_TAG, "BATTL_RSND: ID did not match");
@@ -121,7 +121,8 @@ void logic_as_receiver(twai_message_t rx_msg)
 
 		// Make sure our value is not the same
 		// We can cheat here
-		their_rps = rx_msg.data[2];
+		their_rps = rx_msg.data[2] << 4 | rx_msg.data[3];
+
 		while (my_rps == their_rps)
 			my_rps = get_rps();
 
@@ -355,7 +356,6 @@ static bool firstWin 	= false;
 
 void cat_rpsr_state(TFT_t * dev)
 {
-	uint32_t xpos = 0;
 	uint8_t my_str[12];
 	uint8_t w_or_l[12];
 	uint8_t their_str[12];

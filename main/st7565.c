@@ -698,7 +698,6 @@ int lcdDrawChar2(TFT_t * dev, uint8_t *font, uint16_t x, uint16_t y, uint8_t asc
 		if(xsd) xx = xss;
 		if(ysd) yy = yss;
 		for(int h=0;h<ph/8;h++) {
-			if(_DEBUG_)printf("boop00");
 			mask = 0x80;
 			for(int bit=0;bit<8;bit++) {
 				// if(_DEBUG_)printf("xx=%d yy=%d xd1=%x yd2=%d mask=%02x fonts[%d]=%02x\n",

@@ -35,18 +35,21 @@ uint8_t get_rps()
 	return c_rps;
 }
 
-void send_rps(uint32_t arbid, uint8_t target_id, uint8_t comm_type, uint8_t value)
+void send_rps(uint32_t arbid, uint8_t target_id, uint8_t comm_type, int16_t value)
 {
 	uint8_t tdata[8];
 
 	tdata[0] = comm_type;
 	tdata[1] = target_id;
-	tdata[2] = value;
+	tdata[2] = (uint8_t) (value >> 4) & 0xff;
+	tdata[3] = (uint8_t)  value & 0xff;
 
 	can_send(arbid, 0x1, 0x8, (uint8_t*)&tdata);
 }
 
-bool didWinRPS(uint8_t my_rps, uint8_t tar_rps)
+// woid send_sync()
+
+bool didWinRPS(int16_t my_rps, int16_t tar_rps)
 {
 	/*
 	0 - 1 = -1 L
@@ -57,7 +60,7 @@ bool didWinRPS(uint8_t my_rps, uint8_t tar_rps)
 	2 - 1 =  1 W
 	*/
 
-	int8_t tmp = (int8_t)my_rps - (int8_t)tar_rps;
+	int16_t tmp = my_rps - tar_rps;
 	ESP_LOGI(CMG_TAG, "%d - %d = %d", my_rps, tar_rps, tmp);
 	return ((tmp == 1) || (tmp == -2));
 }
