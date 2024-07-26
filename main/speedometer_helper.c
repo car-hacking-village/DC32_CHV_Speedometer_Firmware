@@ -89,6 +89,9 @@ void updater(uint16_t * tgt_pos)
 			// This is intentionally bad, lol, i am sorry
 			*tgt_pos = calculate_pos_from_speed(c_speed);
 		}
+		// else {
+		// 	*tgt_pos = *tgt_pos - 4
+		// }
 	// }
 }
 
@@ -101,6 +104,9 @@ void speedometer_helper(TFT_t * dev)
 
 	uint16_t cur_pos = 0;
 	uint16_t tgt_pos = speed_entries-1;
+
+	// For debugging
+	// c_speed = 0x3ffc1b26;
 
 	update_queue = xQueueCreate(1, sizeof(uint32_t));
 

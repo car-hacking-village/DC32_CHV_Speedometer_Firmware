@@ -11,13 +11,14 @@ static TaskHandle_t catface_can_t;
 
 QueueHandle_t cat_can_queue = NULL;
 
-static char * rps_str[] = {
+char * rps_str[] = {
 	"Rock",
 	"Paper",
 	"Sicsors",
 };
 
-static char* rps_chars[] = {"Rock",
+// Non-static to keep in correctr memory range
+char* rps_chars[] = {"Rock",
 					 "Paper",
 					 "Scisors",
 					 "Shoot!",
@@ -59,7 +60,7 @@ void logic_as_sender(twai_message_t rx_msg)
 		break;
 
 	case BATTL_RRSP:
-		their_rps = rx_msg.data[2] << 4 | rx_msg.data[3];
+		their_rps = rx_msg.data[2] << 8 | rx_msg.data[3];
 		break;
 
 	default:
@@ -112,17 +113,16 @@ void logic_as_receiver(twai_message_t rx_msg)
 			return;
 		}
 
-		my_rps = get_rps();
-
 		// Make sure our value is not the same
 		// We can cheat here
-		their_rps = rx_msg.data[2] << 4 | rx_msg.data[3];
+		their_rps = rx_msg.data[2] << 8 | rx_msg.data[3];
 
 // #ifndef BOSSBADGE
-		
+
 		while (my_rps == their_rps)
 			my_rps = get_rps();
-		// my_rps = esp_random() % 0x10000;
+		// For debugging
+		// my_rps = 0xC2D;
 
 		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
 
@@ -198,7 +198,8 @@ void state_handler()
 		if (amSender && (l_state != cat_state)) {
 			ESP_LOGI(CAT_TAG, "Sending rps as sender");
 			my_rps = get_rps();
-			// my_rps = esp_random() % 0x10000;
+			// For debugging
+			// my_rps = 0xC2D;
 			send_rps(t_arb, target_id, BATTL_RSND, my_rps);
 		}
 		// return a expression
@@ -342,8 +343,6 @@ void cat_rps_state(TFT_t * dev)
 static bool firstLose 	= false;
 static bool firstWin 	= false;
 
-
-
 /*
 	We do not check the bounds of 'their_rps', so add another screen
 	showing the result of the match, "rock beats scisors", the sender
@@ -360,6 +359,8 @@ void cat_rpsr_state(TFT_t * dev)
 	uint8_t their_str[12];
 
 	ESP_LOGI(CAT_TAG, "rps_str allocation %x", rps_str);
+	ESP_LOGI(CAT_TAG, "rps_str + their_rps %x", rps_str + their_rps);
+	ESP_LOGI(CAT_TAG, "rps_str + their_rps stores %x", rps_str[their_rps]);
 
 	// make global and modify as it goes, reseting the winner
 	if (didWinRPS(my_rps, their_rps)) {

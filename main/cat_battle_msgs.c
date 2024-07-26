@@ -41,7 +41,7 @@ void send_rps(uint32_t arbid, uint8_t target_id, uint8_t comm_type, int16_t valu
 
 	tdata[0] = comm_type;
 	tdata[1] = target_id;
-	tdata[2] = (uint8_t) (value >> 4) & 0xff;
+	tdata[2] = (uint8_t) (value >> 8) & 0xff;
 	tdata[3] = (uint8_t)  value & 0xff;
 
 	can_send(arbid, 0x1, 0x8, (uint8_t*)&tdata);
