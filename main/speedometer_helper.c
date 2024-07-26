@@ -45,10 +45,11 @@ uint16_t calculate_pos_from_speed(uint32_t speed)
 	return (int)((float)speed/120 * (speed_entries-1));
 }
 
+static uint32_t c_speed = 0;
+
 void speedometer_can_helper(void *pvParameters)
 {
-	uint32_t dummy = 0;
-	uint32_t speed = 0;
+	// uint32_t dummy = 0;
 
 	twai_message_t rx_msg;
 
@@ -61,8 +62,9 @@ void speedometer_can_helper(void *pvParameters)
 			}
 			switch (rx_msg.identifier) {
 				case SPEED_ARBID:
-					speed = rx_msg.data[0] | (rx_msg.data[1] << 8) | (rx_msg.data[2] << 16) | (rx_msg.data[3] << 24);
-					xQueueSend(update_queue, dummy, portMAX_DELAY);
+					c_speed = rx_msg.data[0] << 24 | (rx_msg.data[1] << 16) | (rx_msg.data[2] << 8) | (rx_msg.data[3]);
+					xQueueSend(update_queue, &c_speed, portMAX_DELAY);
+					// xQueueSend(update_queue, NULL, portMAX_DELAY);
 					break;
 				default:
 					break;
@@ -72,15 +74,22 @@ void speedometer_can_helper(void *pvParameters)
 }
 
 // Queue to kick the display task
-void wait_for_update()
+void updater(uint16_t * tgt_pos)
 {
 	uint32_t dummy = 0;
 
-	for(;;) {
-		if (xQueueReceive(update_queue, &dummy, portMAX_DELAY)) {
-			return;
+	// for(;;) {
+		// May need to change this back to infinite
+		// if (xQueueReceive(update_queue, &dummy, 0)) {
+		// This only returns if a speed message returns
+		// We can switch on the speed message if we really care
+		// the message could be a structure as well, this is just done to add a little
+		// *mwa* to the problem
+		if (xQueueReceive(update_queue, &dummy, 0)) {
+			// This is intentionally bad, lol, i am sorry
+			*tgt_pos = calculate_pos_from_speed(c_speed);
 		}
-	}
+	// }
 }
 
 // TODO: may want to lock to current postion variable
@@ -100,6 +109,13 @@ void speedometer_helper(TFT_t * dev)
 
 	// make sure this logic does not over flow, not a CTF problem
 	// speed can be normalized by "speed/120 * (speed_entries-1)" and rounding down
+
+	uint8_t t_str[12];
+
+	strcpy((char *)t_str, "'");
+
+	lcdDrawString2(dev, font8x16, 0, 0, t_str, BLACK);
+	lcdWriteBuffer(dev);
 
 	// Init Screen
 	lcdDrawFillArrow(dev, ax_center, ay_center, speed_array[0][0], speed_array[0][1], 2, BLACK);
@@ -123,9 +139,9 @@ void speedometer_helper(TFT_t * dev)
 		 	lcdWriteBuffer(dev);
 			lcdDrawFillArrow(dev, ax_center, ay_center, speed_array[cur_pos][0], speed_array[cur_pos][1], 2, WHITE);
  		}
-		else {
+		// else {
 			// Wait for a new position/speed to be reported
-			wait_for_update();
-		}
+		updater(&tgt_pos);
+		// }
 	}
 }

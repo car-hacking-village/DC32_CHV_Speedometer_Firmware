@@ -20,9 +20,9 @@
 
 #include "gpio_helper.h"
 #include "spiffs_helper.h"
+#include "speedometer_helper.h"
 #include "display_helper.h"
 #include "catface_helper.h"
-#include "speedometer_helper.h"
 
 // #define	INTERVAL 400
 // #define WAIT vTaskDelay(INTERVAL)

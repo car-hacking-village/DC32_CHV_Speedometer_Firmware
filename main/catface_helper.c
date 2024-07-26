@@ -4,9 +4,7 @@
 
 static uint32_t state_tick = 0;
 static uint32_t cat_state = CAT_IDLE;
-static uint32_t cat_expression = EYES_CLOSED;
-
-
+// static uint32_t cat_expression = EYES_CLOSED;
 
 TaskHandle_t catface_t = NULL;
 static TaskHandle_t catface_can_t;
@@ -19,7 +17,13 @@ static char * rps_str[] = {
 	"Sicsors",
 };
 
-uint32_t speed = 0;
+static char* rps_chars[] = {"Rock",
+					 "Paper",
+					 "Scisors",
+					 "Shoot!",
+					} ;
+
+// static uint32_t speed = 0;
 static uint8_t effect = 0;
 
 static bool amSender 		= true;
@@ -29,18 +33,9 @@ static int16_t my_rps 		= RPS_NONE;
 static int16_t their_rps 	= RPS_NONE;
 static uint8_t score[4];
 
-
-char* rps_chars[] = {"Rock",
-					 "Paper",
-					 "Scisors",
-					 "Shoot!",
-					} ;
-
 static uint32_t rps_i = 0;
 #define	RPS_RNDS = 3;
 static uint8_t rps_rnd = 0;
-
-char * flag2 = "flag{not_the_real_flag_two_if_re}";
 
 void logic_as_sender(twai_message_t rx_msg)
 {
@@ -123,8 +118,11 @@ void logic_as_receiver(twai_message_t rx_msg)
 		// We can cheat here
 		their_rps = rx_msg.data[2] << 4 | rx_msg.data[3];
 
+// #ifndef BOSSBADGE
+		
 		while (my_rps == their_rps)
 			my_rps = get_rps();
+		// my_rps = esp_random() % 0x10000;
 
 		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
 
@@ -145,9 +143,9 @@ void catface_can_helper(void *pvParameters)
 			}
 			switch (rx_msg.identifier) {
 
-				case SPEED_ARBID:
-					speed = rx_msg.data[0] | (rx_msg.data[1] << 8) | (rx_msg.data[2] << 16) | (rx_msg.data[3] << 24);
-					break;
+				// case SPEED_ARBID:
+				// 	speed = rx_msg.data[0] << 24 | (rx_msg.data[1] << 16) | (rx_msg.data[2] << 8) | (rx_msg.data[3]);
+				// 	break;
 
 				// We got a message from a RECVR target
 				case BATTL_ARBID_SENDR:
@@ -200,6 +198,7 @@ void state_handler()
 		if (amSender && (l_state != cat_state)) {
 			ESP_LOGI(CAT_TAG, "Sending rps as sender");
 			my_rps = get_rps();
+			// my_rps = esp_random() % 0x10000;
 			send_rps(t_arb, target_id, BATTL_RSND, my_rps);
 		}
 		// return a expression
@@ -452,7 +451,7 @@ void cat_dedd_state(TFT_t * dev)
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
 
 	// This is useless, just to make sure the flag is not compiled out
-	ESP_LOGI(CAT_TAG, "%s", flag2);
+	// ESP_LOGI(CAT_TAG, "%s", flag2);
 }
 
 void catface_helper(TFT_t * dev)

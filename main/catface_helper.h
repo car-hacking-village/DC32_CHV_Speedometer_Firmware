@@ -16,7 +16,7 @@
 #include "cat_battle_msgs.h"
 #include "speedometer.h"
 
-#include "font6x8.h"
+// #include "font6x8.h"
 #include "font8x16.h"
 #include "font8x8.h"
 #include "font32x32.h"
