@@ -224,6 +224,32 @@ void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect)
 	lcdDrawString2(dev, font32x32, xpos, 50, expression, WHITE);
 }
 
+void eye_sparkle(TFT_t * dev)
+{
+	uint8_t ascii[4];
+
+	long strt_t = xTaskGetTickCount();
+	long curr_t = 0;
+	long wait_t = (esp_random() % (5 * 1000)) ^ 1000;
+
+	int i = 0;
+	int j = 1;
+
+	do {
+		ascii[0] = SYM_32_OID1 + (i % 3);
+		ascii[1] = SYM_32_SPAC;
+		ascii[2] = SYM_32_OID1 + (j % 3);
+		ascii[3] = SYM_32_NULL;
+
+		change_expression(dev, ascii, NO_EFFECT);
+
+		i++;
+		j++;
+
+		curr_t = xTaskGetTickCount();
+	} while ((curr_t < (strt_t + wait_t)) && (cat_state == CAT_IDLE));
+}
+
 /*
 	Each state, besides the eyes being closed, keep a random amount of time they keep track of
 	when the tick could expires the eyes close for a set amount and a random state is entered
@@ -253,12 +279,14 @@ void cat_idle_state(TFT_t * dev)
 		{
 		case EYES_OPEN_FOWARD:
 			// 1,000,000 is about 1.0s
-			state_tick = (esp_random() % (4 * 1000)) ^ 600;
-			ascii[0] = SYM_32_OFWD;
-			ascii[1] = SYM_32_SPAC;
-			ascii[2] = SYM_32_OFWD;
-			ascii[3] = SYM_32_NULL;
-			break;
+			// state_tick = (esp_random() % (4 * 1000)) ^ 600;
+			// ascii[0] = SYM_32_OFWD;
+			// ascii[1] = SYM_32_SPAC;
+			// ascii[2] = SYM_32_OFWD;
+			// ascii[3] = SYM_32_NULL;
+			eye_sparkle(dev);
+			return;
+			// break;
 		case EYES_OPEN_RIGHT:
 			// 1,000,000 is about 1.0s
 			state_tick = (esp_random() % (4 * 1000)) ^ 600;
@@ -273,6 +301,22 @@ void cat_idle_state(TFT_t * dev)
 			ascii[0] = SYM_32_OLFT;
 			ascii[1] = SYM_32_SPAC;
 			ascii[2] = SYM_32_OLFT;
+			ascii[3] = SYM_32_NULL;
+			break;
+		case EYES_OPEN_ANGRY:
+			// 1,000,000 is about 1.0s
+			state_tick = (esp_random() % (4 * 1000)) ^ 600;
+			ascii[0] = SYM_32_ANGL;
+			ascii[1] = SYM_32_SPAC;
+			ascii[2] = SYM_32_ANGR;
+			ascii[3] = SYM_32_NULL;
+			break;
+		case EYES_OPEN_REAL:
+			// 1,000,000 is about 1.0s
+			state_tick = (esp_random() % (4 * 1000)) ^ 600;
+			ascii[0] = SYM_32_RELL;
+			ascii[1] = SYM_32_SPAC;
+			ascii[2] = SYM_32_RELR;
 			ascii[3] = SYM_32_NULL;
 			break;
 		case EYES_CLOSED:
