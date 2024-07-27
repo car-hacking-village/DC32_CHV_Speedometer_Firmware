@@ -118,6 +118,7 @@ void logic_as_receiver(twai_message_t rx_msg)
 		their_rps = rx_msg.data[2] << 8 | rx_msg.data[3];
 
 // #ifndef BOSSBADGE
+		my_rps = get_rps();
 
 		while (my_rps == their_rps)
 			my_rps = get_rps();
