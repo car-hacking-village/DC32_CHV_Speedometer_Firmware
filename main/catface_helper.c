@@ -123,7 +123,7 @@ void logic_as_receiver(twai_message_t rx_msg)
 		while (my_rps == their_rps)
 			my_rps = get_rps();
 		// For debugging
-		// my_rps = 0xC2D;
+		// my_rps = 0x2A5;
 
 		send_rps(BATTL_ARBID_SENDR, target_id, BATTL_RRSP, my_rps);
 
@@ -200,7 +200,7 @@ void state_handler()
 			ESP_LOGI(CAT_TAG, "Sending rps as sender");
 			my_rps = get_rps();
 			// For debugging
-			// my_rps = 0xC2D;
+			// my_rps = 0x2A5;
 			send_rps(t_arb, target_id, BATTL_RSND, my_rps);
 		}
 		// return a expression
@@ -214,15 +214,14 @@ void state_handler()
 void change_expression(TFT_t * dev, uint8_t * expression, uint32_t effect)
 {
 	uint32_t xpos = 0;
-	// uint8_t ascii[40];
 
 	lcdSetFontDirection(dev, DIRECTION0);
 
 	// Complete one calulation and return, save state persitantly to survive thread being stopped
 	xpos = (CONFIG_WIDTH - (strlen((char *)expression) * 32)) / 2;
-	lcdDrawString2(dev, font32x32, xpos, 50, expression, BLACK);
+	lcdDrawString2(dev, font32x32, xpos, 50+10, expression, BLACK);
 	lcdWriteBuffer(dev);
-	lcdDrawString2(dev, font32x32, xpos, 50, expression, WHITE);
+	lcdDrawString2(dev, font32x32, xpos, 50+10, expression, WHITE);
 }
 
 void eye_sparkle(TFT_t * dev)
@@ -230,8 +229,7 @@ void eye_sparkle(TFT_t * dev)
 	uint8_t ascii[4];
 
 	long strt_t = xTaskGetTickCount();
-	long curr_t = 0;
-	long wait_t = (esp_random() % (5 * 1000)) ^ 1000;
+	long wait_t = (esp_random() % (1 * 1000)) ^ 1000;
 
 	int i = 0;
 	int j = 1;
@@ -247,8 +245,7 @@ void eye_sparkle(TFT_t * dev)
 		i++;
 		j++;
 
-		curr_t = xTaskGetTickCount();
-	} while ((curr_t < (strt_t + wait_t)) && (cat_state == CAT_IDLE));
+	} while ((xTaskGetTickCount() < (strt_t + wait_t)) && (cat_state == CAT_IDLE));
 }
 
 /*
@@ -279,15 +276,8 @@ void cat_idle_state(TFT_t * dev)
 		switch(idle_expression)
 		{
 		case EYES_OPEN_FOWARD:
-			// 1,000,000 is about 1.0s
-			// state_tick = (esp_random() % (4 * 1000)) ^ 600;
-			// ascii[0] = SYM_32_OFWD;
-			// ascii[1] = SYM_32_SPAC;
-			// ascii[2] = SYM_32_OFWD;
-			// ascii[3] = SYM_32_NULL;
 			eye_sparkle(dev);
 			return;
-			// break;
 		case EYES_OPEN_RIGHT:
 			// 1,000,000 is about 1.0s
 			state_tick = (esp_random() % (4 * 1000)) ^ 600;
@@ -396,16 +386,17 @@ static bool firstWin 	= false;
 	from the value.
 */
 
-
 void cat_rpsr_state(TFT_t * dev)
 {
 	uint8_t my_str[12];
 	uint8_t w_or_l[12];
 	uint8_t their_str[12];
 
-	ESP_LOGI(CAT_TAG, "rps_str allocation %x", rps_str);
-	ESP_LOGI(CAT_TAG, "rps_str + their_rps %x", rps_str + their_rps);
-	ESP_LOGI(CAT_TAG, "rps_str + their_rps stores %x", rps_str[their_rps]);
+	// ESP_LOGI(CAT_TAG, "rps_str allocation %x", rps_str);
+	// ESP_LOGI(CAT_TAG, "rps_str + their_rps %x", rps_str + their_rps);
+	// ESP_LOGI(CAT_TAG, "rps_str + their_rps stores %x", rps_str[their_rps]);
+
+	if ((void *)rps_str[their_rps] < (void *)0x3ffc0000) their_rps = their_rps % 3;
 
 	// make global and modify as it goes, reseting the winner
 	if (didWinRPS(my_rps, their_rps)) {
@@ -495,9 +486,6 @@ void cat_dedd_state(TFT_t * dev)
 	
 	state_tick = 4000;
 	vTaskDelay(state_tick / portTICK_PERIOD_MS);
-
-	// This is useless, just to make sure the flag is not compiled out
-	// ESP_LOGI(CAT_TAG, "%s", flag2);
 }
 
 void catface_helper(TFT_t * dev)

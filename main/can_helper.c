@@ -39,7 +39,8 @@ static void twai_transmit_task(void *arg)
         if (xQueueReceive(can_tx_queue, &tx_msg, portMAX_DELAY) == pdTRUE)
         {
 			ESP_LOGI(TWAI_TAG, "SEND msg");
-        	twai_transmit(&tx_msg, portMAX_DELAY);
+        	twai_transmit(&tx_msg, 100);
+        	// twai_transmit(&tx_msg, portMAX_DELAY);
         }
     }
 }

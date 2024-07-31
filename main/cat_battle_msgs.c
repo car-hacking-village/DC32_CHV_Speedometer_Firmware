@@ -64,3 +64,18 @@ bool didWinRPS(int16_t my_rps, int16_t tar_rps)
 	ESP_LOGI(CMG_TAG, "%d - %d = %d", my_rps, tar_rps, tmp);
 	return ((tmp == 1) || (tmp == -2));
 }
+
+// void send_speed_test()
+// {
+// 	// Place holder for now
+// 	uint8_t tdata[8];
+
+// 	// 3f006c38
+// 	// 3ffc1eac
+// 	tdata[0] = 0x3f;
+// 	tdata[1] = 0xfc;
+// 	tdata[2] = 0x1e;
+// 	tdata[3] = 0xac;
+
+// 	can_send(0x100, 0x1, 0x8, (uint8_t*)&tdata);
+// }

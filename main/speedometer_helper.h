@@ -4,7 +4,10 @@
 #include "st7565.h"
 #include "can_helper.h"
 
-#include "font8x16.h"
+#include "cat_battle_msgs.h"
+
+
+// #include "font8x16.h"
 
 #define SPD_TAG 				"SPD"
 

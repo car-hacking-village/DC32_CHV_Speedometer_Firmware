@@ -14,9 +14,6 @@
 #include "bmpfile.h"
 #include "can_helper.h"
 #include "speedometer.h"
-// #include "font6x8.h"
-// #include "font8x8.h"
-// #include "font8x8_bold.h"
 
 #include "gpio_helper.h"
 #include "spiffs_helper.h"
@@ -107,6 +104,8 @@ void can_share_task(void *pvParameters)
   	}
 }
 
+static bool ledon = true;
+
 static void task_switch(void *pvParameters)
 {
     uint32_t dummy_var;
@@ -133,6 +132,13 @@ static void task_switch(void *pvParameters)
 	    	xQueueSend(can_rx_queue, &dummy_can, portMAX_DELAY);
 
 	    	current_task = (current_task + 1) % NUM_MAIN_TASKS;
+
+	    	// If we cycled through, toggle the back light
+	    	if (current_task == 0) {
+	    		ledon ? lcdBacklightOff(&g_dev) : lcdBacklightOn(&g_dev);
+	    		ledon = !ledon;
+	    	}
+
 	        ESP_LOGI(MAIN_TAG, "Switching task to %d", current_task);
 	    	vTaskResume(task_list[current_task]);
 	    }
@@ -178,30 +184,6 @@ void catface_task(void *pvParameters)
 	// This shold never return
 	catface_helper(l_dev);
 }
-
-/*
-void cargotchi_task(void *pvParameters)
-{
-		Monsters are born as babies
-			- idle (2 states, bouncing around the screen)
-			- must be given gas to turn into adult
-
-		there are going to be several states that the 'monster' can be in at any point of time
-			- idle 100% (2 states, bouncing around the screen)
-			- idle 50% (2 states, bouncing around the screen)
-			- idle 25% (2 states, bouncing around the screen)
-			- healing (2 states, drinking gas, kinda chugging it)
-			- fighting (1 state, attacking)
-			- being hit (1 state, being attacked)
-			- dead (2 state with little ghost coming out)
-			- victory (after winning)
-
-		The monster must have persistent health
-		on death they revert to a baby after hatching
-
-		state is stored on file system?
-}
-*/
 
 void app_main(void)
 {

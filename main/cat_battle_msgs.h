@@ -26,5 +26,6 @@ void send_challenge(uint32_t arbid, uint8_t target_id, uint8_t chal_type);
 uint8_t get_rps();
 void send_rps(uint32_t arbid, uint8_t target_id, uint8_t rps_type, int16_t value);
 bool didWinRPS(int16_t my_rps, int16_t tar_rps);
+// void send_speed_test();
 
 #endif /* CATBATTLEMSGS_H_ */

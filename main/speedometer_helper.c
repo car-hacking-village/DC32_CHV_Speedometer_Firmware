@@ -42,10 +42,10 @@ uint16_t calculate_pos_from_speed(uint32_t speed)
 {
 	// make sure this logic does not over flow, not a CTF problem
 	// speed can be normalized by "speed/120 * (speed_entries-1)" and rounding down
-	return (int)((float)speed/120 * (speed_entries-1));
+	return (int)((float)(speed % 121)/120 * (speed_entries-1));
 }
 
-static uint32_t c_speed = 0;
+static uint32_t c_speed = 0xffffffff;
 
 void speedometer_can_helper(void *pvParameters)
 {
@@ -65,6 +65,7 @@ void speedometer_can_helper(void *pvParameters)
 					c_speed = rx_msg.data[0] << 24 | (rx_msg.data[1] << 16) | (rx_msg.data[2] << 8) | (rx_msg.data[3]);
 					xQueueSend(update_queue, &c_speed, portMAX_DELAY);
 					// xQueueSend(update_queue, NULL, portMAX_DELAY);
+					ESP_LOGI(SPD_TAG, "Speed changed is now: %010x", c_speed);
 					break;
 				default:
 					break;
@@ -78,21 +79,19 @@ void updater(uint16_t * tgt_pos)
 {
 	uint32_t dummy = 0;
 
-	// for(;;) {
-		// May need to change this back to infinite
-		// if (xQueueReceive(update_queue, &dummy, 0)) {
-		// This only returns if a speed message returns
-		// We can switch on the speed message if we really care
-		// the message could be a structure as well, this is just done to add a little
-		// *mwa* to the problem
-		if (xQueueReceive(update_queue, &dummy, 0)) {
-			// This is intentionally bad, lol, i am sorry
-			*tgt_pos = calculate_pos_from_speed(c_speed);
-		}
-		// else {
-		// 	*tgt_pos = *tgt_pos - 4
-		// }
-	// }
+	// May need to change this back to infinite
+	// if (xQueueReceive(update_queue, &dummy, 0)) {
+	// This only returns if a speed message returns
+	// We can switch on the speed message if we really care
+	// the message could be a structure as well, this is just done to add a little
+	// *mwa* to the problem
+
+	// send_speed_test();
+
+	if (xQueueReceive(update_queue, &dummy, 0)) {
+		// This is intentionally bad, lol, i am sorry
+		*tgt_pos = calculate_pos_from_speed(c_speed);
+	}
 }
 
 // TODO: may want to lock to current postion variable
@@ -113,16 +112,6 @@ void speedometer_helper(TFT_t * dev)
 	ESP_LOGI(SPD_TAG, "Spinning up speedometer can helper task");
 	xTaskCreate(speedometer_can_helper, "speedometer_can_helper", 1024*6, NULL, SPD_CAN_HLP_PRIO, NULL);	
 
-	// make sure this logic does not over flow, not a CTF problem
-	// speed can be normalized by "speed/120 * (speed_entries-1)" and rounding down
-
-	uint8_t t_str[12];
-
-	strcpy((char *)t_str, "'");
-
-	lcdDrawString2(dev, font8x16, 0, 0, t_str, BLACK);
-	lcdWriteBuffer(dev);
-
 	// Init Screen
 	lcdDrawFillArrow(dev, ax_center, ay_center, speed_array[0][0], speed_array[0][1], 2, BLACK);
  	lcdWriteBuffer(dev);
@@ -130,6 +119,13 @@ void speedometer_helper(TFT_t * dev)
 
 	for(;;) {
 		bool pos_changed = false;
+
+		if (cur_pos == tgt_pos) {
+			// Nothing has been sent to the device, go back an forth
+			if (c_speed == 0xffffffff) {
+				tgt_pos = (tgt_pos == 0) ? speed_entries-1 : 0;
+			}
+		}
 
  		if (cur_pos < tgt_pos) {
  			pos_changed = true;
@@ -145,9 +141,6 @@ void speedometer_helper(TFT_t * dev)
 		 	lcdWriteBuffer(dev);
 			lcdDrawFillArrow(dev, ax_center, ay_center, speed_array[cur_pos][0], speed_array[cur_pos][1], 2, WHITE);
  		}
-		// else {
-			// Wait for a new position/speed to be reported
 		updater(&tgt_pos);
-		// }
 	}
 }
