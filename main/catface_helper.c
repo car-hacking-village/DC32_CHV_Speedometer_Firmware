@@ -396,6 +396,7 @@ void cat_rpsr_state(TFT_t * dev)
 	// ESP_LOGI(CAT_TAG, "rps_str + their_rps %x", rps_str + their_rps);
 	// ESP_LOGI(CAT_TAG, "rps_str + their_rps stores %x", rps_str[their_rps]);
 
+	// Skrew you pal!
 	if ((void *)rps_str[their_rps] < (void *)0x3ffc0000) their_rps = their_rps % 3;
 
 	// make global and modify as it goes, reseting the winner
